@@ -5,7 +5,7 @@
 这是 iOS 构建所需的源码子集。使用原 C++/Metal 光谱引擎；当前版本已编译完成，并已在真机验证。
 
 真机验证截图如下：
-<img width="1206" height="2622" alt="fd461a0691dba6b598251a2308a1b61a" src="https://github.com/user-attachments/assets/244821b3-9bd6-4e08-8733-c68b96775a6c" />
+<img width="120" height="262" alt="fd461a0691dba6b598251a2308a1b61a" src="https://github.com/user-attachments/assets/244821b3-9bd6-4e08-8733-c68b96775a6c" />
 真机型号为iPhone18Pro，iOS版本27.2。镜头切换及可变光圈可正常调用。
 
 ## 云端编译
