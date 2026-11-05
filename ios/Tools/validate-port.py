@@ -52,8 +52,10 @@ def validate():
         info = plistlib.load(f)
     for key in ["NSCameraUsageDescription", "NSPhotoLibraryAddUsageDescription"]:
         if not info.get(key): errors.append(f"Missing permission usage string: {key}")
-    if info.get("UISupportedInterfaceOrientations") != ["UIInterfaceOrientationPortrait"]:
-        errors.append("Camera orientation code currently requires portrait-only UI")
+    if set(info.get("UISupportedInterfaceOrientations", [])) != {
+        "UIInterfaceOrientationPortrait", "UIInterfaceOrientationLandscapeLeft", "UIInterfaceOrientationLandscapeRight"
+    }:
+        errors.append("Camera UI must support portrait and both landscape directions")
     project = (ROOT / "PocketFilm.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
     for source in list((ROOT / "PocketFilm").glob("*.swift")) + list((ROOT / "PocketFilmTests").glob("*.swift")):
         if source.name not in project: errors.append(f"Source absent from Xcode project: {source.name}")

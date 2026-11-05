@@ -1,9 +1,30 @@
 import XCTest
 import CoreImage
 import Metal
+import UIKit
 @testable import PocketFilm
 
 final class PortTests: XCTestCase {
+    func testRearCameraRotationMatchesDeviceAndInterfaceDirections() {
+        XCTAssertEqual(CameraOrientation.captureAngle(for: .portrait, fallback: 0), 90)
+        XCTAssertEqual(CameraOrientation.captureAngle(for: .portraitUpsideDown, fallback: 0), 270)
+        // Device and interface landscape naming is reversed in UIKit.
+        XCTAssertEqual(CameraOrientation.captureAngle(for: .landscapeLeft, fallback: 90),
+                       CameraOrientation.previewAngle(for: .landscapeRight))
+        XCTAssertEqual(CameraOrientation.captureAngle(for: .landscapeRight, fallback: 90),
+                       CameraOrientation.previewAngle(for: .landscapeLeft))
+        XCTAssertEqual(CameraOrientation.previewAngle(for: .landscapeRight), 0)
+        XCTAssertEqual(CameraOrientation.previewAngle(for: .landscapeLeft), 180)
+    }
+
+    func testFlatDeviceKeepsLastCaptureOrientation() {
+        for orientation in [UIDeviceOrientation.faceUp, .faceDown, .unknown] {
+            for previous in [CGFloat(0), 90, 180, 270] {
+                XCTAssertEqual(CameraOrientation.captureAngle(for: orientation, fallback: previous), previous)
+            }
+        }
+    }
+
     func testRawModeNeverSilentlySubstitutesAnotherFormat() {
         let pro: (OSType) -> Bool = { $0 == 2 }
         let bayer: (OSType) -> Bool = { $0 == 1 }

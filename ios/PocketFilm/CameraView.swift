@@ -8,8 +8,77 @@ struct CameraView: View {
     @State private var library = false
     @State private var about = false
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
+        GeometryReader { geometry in
+            let landscape = geometry.size.width > geometry.size.height
+            VStack(spacing: 8) {
+                header
+                if landscape {
+                    HStack(spacing: 12) {
+                        cameraPreview(landscape: true)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        VStack(spacing: 8) {
+                            controls
+                            shutter
+                        }.frame(width: min(340, geometry.size.width * 0.42))
+                    }
+                } else {
+                    cameraPreview(landscape: false)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    controls.frame(maxHeight: min(260, geometry.size.height * 0.32))
+                    shutter
+                    footer
+                }
+            }
+        }
+        .onChange(of: model.apertureSelection) { _, _ in model.changeAperture() }
+        .onChange(of: model.recipe) { _, _ in model.updateRecipe() }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.rawImage], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls): if let url = urls.first { model.importRAW(url) }
+            case .failure(let error): model.errorMessage = error.localizedDescription
+            }
+        }
+        .sheet(isPresented: $library) {
+            NavigationStack {
+                List(model.captures) { item in
+                    Button {
+                        library = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { model.show(item) }
+                    } label: {
+                        HStack {
+                            Image(systemName: "photo").font(.title2)
+                            VStack(alignment: .leading) {
+                                Text(item.id.prefix(8)).font(.headline)
+                                Text(FileManager.default.fileExists(atPath: item.jpeg.path) ? "RAW 与成片" : "RAW 已保留，可重新显影")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }.navigationTitle("本地底片")
+                    .toolbar { Button("完成") { library = false } }
+            }
+        }
+        .sheet(isPresented: $model.showingResult, onDismiss: { model.closeResult() }) {
+            if let item = model.selectedCapture { CaptureView(model: model, item: item) }
+        }
+        .sheet(isPresented: $about) { LicensesView() }
+        .alert("提示", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+            Button("好", role: .cancel) { model.errorMessage = nil }
+        } message: { Text(model.errorMessage ?? "") }
+    }
+    private func cameraPreview(landscape: Bool) -> some View {
+        ZStack {
+            CameraPreview(session: model.captureSession, guide: model.guide, onFocus: { model.focus(at: $0) })
+                .allowsHitTesting(!model.isProcessing && !model.isSwitchingLens)
+            if model.isProcessing {
+                ProgressView().padding(20).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }.aspectRatio(landscape ? 4.0/3.0 : 3.0/4.0, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 18)).padding(.horizontal, 8)
+    }
+
+    private var header: some View {
+        HStack {
                 VStack(alignment: .leading) {
                     Text("PocketFilm").font(.title2.bold())
                     Text("光谱胶片相机").font(.caption).foregroundStyle(.secondary)
@@ -21,16 +90,10 @@ struct CameraView: View {
                 Button { about = true } label: { Image(systemName: "info.circle") }
                     .accessibilityLabel("关于与开源许可")
             }.padding(.horizontal)
+    }
 
-            ZStack {
-                CameraPreview(session: model.captureSession, guide: model.guide)
-                if model.isProcessing {
-                    ProgressView().padding(20).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                }
-            }.aspectRatio(3/4, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 18)).padding(.horizontal, 8)
-
-            ScrollView { VStack(spacing: 10) {
+    private var controls: some View {
+        ScrollView { VStack(spacing: 10) {
                 HStack {
                     Picker("胶片", selection: $model.recipe.film) {
                         ForEach(model.stocks) { Text($0.name).tag($0.id) }
@@ -87,8 +150,11 @@ struct CameraView: View {
                 }
                 Text(model.status).font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading).lineLimit(2)
-            }.padding(.horizontal).disabled(model.isProcessing) }.frame(maxHeight: 260)
-                HStack {
+            }.padding(.horizontal).disabled(model.isProcessing) }
+    }
+
+    private var shutter: some View {
+        HStack {
                     Button { library = true } label: {
                         Label("底片", systemImage: "photo.stack").font(.callout)
                     }.disabled(model.isProcessing)
@@ -101,46 +167,13 @@ struct CameraView: View {
                     Spacer()
                     Text("RAW\n+ JPEG").font(.caption2.monospaced()).multilineTextAlignment(.center)
                 }.padding(.vertical, 4)
-                Text("原生取景；胶片效果和片边在拍后显影时生效。框线仅辅助构图；开启片边后成片按所选胶片画幅裁剪。")
-                    .font(.caption2).foregroundStyle(.secondary)
-
-        }
-        .onChange(of: model.apertureSelection) { _, _ in model.changeAperture() }
-        .onChange(of: model.recipe) { _, _ in model.updateRecipe() }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.rawImage], allowsMultipleSelection: false) { result in
-            switch result {
-            case .success(let urls): if let url = urls.first { model.importRAW(url) }
-            case .failure(let error): model.errorMessage = error.localizedDescription
-            }
-        }
-        .sheet(isPresented: $library) {
-            NavigationStack {
-                List(model.captures) { item in
-                    Button {
-                        library = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { model.show(item) }
-                    } label: {
-                        HStack {
-                            Image(systemName: "photo").font(.title2)
-                            VStack(alignment: .leading) {
-                                Text(item.id.prefix(8)).font(.headline)
-                                Text(FileManager.default.fileExists(atPath: item.jpeg.path) ? "RAW 与成片" : "RAW 已保留，可重新显影")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }.navigationTitle("本地底片")
-                    .toolbar { Button("完成") { library = false } }
-            }
-        }
-        .sheet(isPresented: $model.showingResult, onDismiss: { model.closeResult() }) {
-            if let item = model.selectedCapture { CaptureView(model: model, item: item) }
-        }
-        .sheet(isPresented: $about) { LicensesView() }
-        .alert("提示", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
-            Button("好", role: .cancel) { model.errorMessage = nil }
-        } message: { Text(model.errorMessage ?? "") }
     }
+
+    private var footer: some View {
+        Text("原生取景；胶片效果和片边在拍后显影时生效。框线仅辅助构图；开启片边后成片按所选胶片画幅裁剪。")
+                    .font(.caption2).foregroundStyle(.secondary)
+    }
+
     private func parameterSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>,
                                  step: Double, text: String) -> some View {
         HStack {

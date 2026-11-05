@@ -12,14 +12,17 @@ enum CompositionGuide: String, CaseIterable, Identifiable {
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     let guide: CompositionGuide
+    var onFocus: (CGPoint) -> Void = { _ in }
     func makeUIView(context: Context) -> PreviewHost {
         let view = PreviewHost()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspect
+        view.onFocus = onFocus
         return view
     }
     func updateUIView(_ view: PreviewHost, context: Context) {
         view.guide = guide
+        view.onFocus = onFocus
         view.setNeedsLayout()
     }
 }
@@ -28,7 +31,10 @@ final class PreviewHost: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
     var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
     var guide: CompositionGuide = .thirds
+    var onFocus: ((CGPoint) -> Void)?
     private let guideLayer = CAShapeLayer()
+    private let focusLayer = CAShapeLayer()
+    private var hideFocus: DispatchWorkItem?
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .black
@@ -39,12 +45,45 @@ final class PreviewHost: UIView {
         guideLayer.shadowOpacity = 0.5
         guideLayer.shadowRadius = 1
         layer.addSublayer(guideLayer)
+        focusLayer.strokeColor = UIColor.systemYellow.cgColor
+        focusLayer.fillColor = UIColor.clear.cgColor
+        focusLayer.lineWidth = 2
+        focusLayer.opacity = 0
+        layer.addSublayer(focusLayer)
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(focusTapped(_:))))
+        accessibilityLabel = "相机取景，点击画面选择对焦点"
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        setNeedsLayout()
+    }
+
+    @objc private func focusTapped(_ gesture: UITapGestureRecognizer) {
+        guard previewLayer.isPreviewing else { return }
+        let point = gesture.location(in: self)
+        let video = previewLayer.layerRectConverted(
+            fromMetadataOutputRect: CGRect(x: 0, y: 0, width: 1, height: 1)).intersection(bounds)
+        guard video.contains(point) else { return } // Ignore letterboxing.
+        let devicePoint = previewLayer.captureDevicePointConverted(fromLayerPoint: point)
+        onFocus?(devicePoint)
+        hideFocus?.cancel()
+        focusLayer.removeAllAnimations()
+        focusLayer.frame = bounds
+        focusLayer.path = UIBezierPath(rect: CGRect(x: point.x - 30, y: point.y - 30, width: 60, height: 60)).cgPath
+        focusLayer.opacity = 1
+        let work = DispatchWorkItem { [weak self] in self?.focusLayer.opacity = 0 }
+        hideFocus = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        if let connection = previewLayer.connection, connection.isVideoRotationAngleSupported(90) {
-            connection.videoRotationAngle = 90
+        let angle = CameraOrientation.previewAngle(for: window?.windowScene?.interfaceOrientation ?? .portrait)
+        if let connection = previewLayer.connection, connection.isVideoRotationAngleSupported(angle),
+           connection.videoRotationAngle != angle {
+            connection.videoRotationAngle = angle
+            focusLayer.opacity = 0
         }
         guideLayer.frame = bounds
         let video = previewLayer.layerRectConverted(

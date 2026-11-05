@@ -20,12 +20,18 @@ final class CameraModel {
     private let camera = CameraService()
     private let worker = RenderWorker()
     private var active = false
+    private var captureRotationAngle: CGFloat = 90
+    @ObservationIgnored private var orientationObserver: NSObjectProtocol?
     var guide = CompositionGuide.thirds
     var apertureSelection: Double = 0
     var isSwitchingLens = false
     var captureSession: AVCaptureSession { camera.session }
 
     init() {
+        orientationObserver = NotificationCenter.default.addObserver(forName: UIDevice.orientationDidChangeNotification,
+            object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.refreshOrientation() }
+            }
         camera.onState = { [weak self] state in
             Task { @MainActor in
                 guard let self else { return }
@@ -70,16 +76,22 @@ final class CameraModel {
     func setActive(_ value: Bool) {
         // App-hosted tests must not ask for camera permission or capture frames.
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return }
+        if value != active {
+            if value { UIDevice.current.beginGeneratingDeviceOrientationNotifications() }
+            else { UIDevice.current.endGeneratingDeviceOrientationNotifications() }
+        }
         active = value
+        if value { refreshOrientation() }
         if value { camera.start() } else { camera.stop() }
     }
 
     func capture() {
         guard canCapture else { return }
+        refreshOrientation()
         beginProcessing("正在拍摄 RAW…")
         recipe.border.frameSeed = Int.random(in: 1...Int(Int32.max))
         let snapshot = recipe
-        camera.capture(preferProRAW: preferProRAW) { [weak self] result in
+        camera.capture(preferProRAW: preferProRAW, rotationAngle: captureRotationAngle) { [weak self] result in
             Task { @MainActor in
                 guard let self else { return }
                 switch result {
@@ -189,4 +201,14 @@ final class CameraModel {
         camera.selectLens(id)
     }
     func changeAperture() { camera.setAperture(apertureSelection == 0 ? nil : apertureSelection) }
+    private func refreshOrientation() {
+        captureRotationAngle = CameraOrientation.captureAngle(for: UIDevice.current.orientation, fallback: captureRotationAngle)
+    }
+    func focus(at point: CGPoint) {
+        guard active, !isProcessing, !isSwitchingLens, !showingResult else { return }
+        camera.focus(at: point)
+    }
+    deinit {
+        if let orientationObserver { NotificationCenter.default.removeObserver(orientationObserver) }
+    }
 }

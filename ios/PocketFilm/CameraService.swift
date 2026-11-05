@@ -115,11 +115,6 @@ final class CameraService: NSObject {
             Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height)
         }) { photoOutput.maxPhotoDimensions = dimensions }
         photoOutput.maxPhotoQualityPrioritization = .quality
-        for output in [photoOutput as AVCaptureOutput] {
-            if let connection = output.connection(with: .video), connection.isVideoRotationAngleSupported(90) {
-                connection.videoRotationAngle = 90
-            }
-        }
         currentDevice = camera
         selectedDeviceID = camera.uniqueID
         // Returning to a previously used physical camera must not inherit its
@@ -127,6 +122,9 @@ final class CameraService: NSObject {
         try camera.lockForConfiguration()
         if camera.isExposureModeSupported(.continuousAutoExposure) {
             camera.exposureMode = .continuousAutoExposure
+        }
+        if camera.isFocusModeSupported(.continuousAutoFocus) {
+            camera.focusMode = .continuousAutoFocus
         }
         camera.unlockForConfiguration()
         apertureObservation = camera.observe(\.lensAperture, options: [.new]) { [weak self] _, _ in
@@ -206,7 +204,26 @@ final class CameraService: NSObject {
         formats.first(where: preferProRAW ? isProRAW : isBayer)
     }
 
-    func capture(preferProRAW: Bool, completion: @escaping (Result<Data, Error>) -> Void) {
+    func focus(at point: CGPoint) {
+        queue.async {
+            guard self.configured, self.session.isRunning, self.photoDelegates.isEmpty,
+                  let camera = self.currentDevice else { return }
+            guard camera.isFocusPointOfInterestSupported,
+                  camera.isFocusModeSupported(.autoFocus) || camera.isFocusModeSupported(.continuousAutoFocus) else {
+                DispatchQueue.main.async { self.onInterrupted?("当前镜头不支持选择自动对焦点。") }
+                return
+            }
+            do {
+                try camera.lockForConfiguration()
+                defer { camera.unlockForConfiguration() }
+                camera.focusPointOfInterest = CGPoint(x: min(1, max(0, point.x)), y: min(1, max(0, point.y)))
+                camera.focusMode = camera.isFocusModeSupported(.continuousAutoFocus) ? .continuousAutoFocus : .autoFocus
+                // Exposure and aperture remain under their existing controls.
+            } catch { self.fail(error.localizedDescription) }
+        }
+    }
+
+    func capture(preferProRAW: Bool, rotationAngle: CGFloat, completion: @escaping (Result<Data, Error>) -> Void) {
         queue.async {
             guard self.configured, self.session.isRunning else {
                 DispatchQueue.main.async { completion(.failure(PocketFailure.message("相机尚未就绪。"))) }; return
@@ -216,6 +233,13 @@ final class CameraService: NSObject {
                 isBayer: AVCapturePhotoOutput.isBayerRAWPixelFormat) else {
                 DispatchQueue.main.async { completion(.failure(PocketFailure.message("当前配置不支持选中的 RAW 模式。"))) }; return
             }
+            // Snapshot once per shutter press, before capturePhoto. PhotoOutput
+            // records this in RAW's orientation metadata, without rewriting pixels.
+            guard let connection = self.photoOutput.connection(with: .video),
+                  connection.isVideoRotationAngleSupported(rotationAngle) else {
+                DispatchQueue.main.async { completion(.failure(PocketFailure.message("当前相机无法设置照片方向。"))) }; return
+            }
+            connection.videoRotationAngle = rotationAngle
             let settings = AVCapturePhotoSettings(rawPixelFormatType: raw)
             settings.maxPhotoDimensions = self.photoOutput.maxPhotoDimensions
             settings.photoQualityPrioritization = .quality
