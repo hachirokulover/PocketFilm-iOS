@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/JamesQiu2005/SpektraLab",
+  "commit": "02d82b56cf65f0f8e802a708612edc4e9a4790af",
+  "port_name": "PocketFilm",
+  "requested_device": "iPhone 18 Pro",
+  "requested_os": "iOS 27.2",
+  "minimum_deployment_target": "iOS 17.0",
+  "status": "source port; Xcode, Metal and device validation pending",
+  "upstream_engine_changes": [
+    "engine/src/gpu/metal_gpu.cpp: container temporary directory on iOS; simulator plain-texture result with retained source buffer"
+  ],
+  "port_version": "0.3.0",
+  "required_build_sdk": "iOS 27 / Xcode 27",
+  "preview": "Native AVCaptureVideoPreviewLayer; no live film rendering"
+}

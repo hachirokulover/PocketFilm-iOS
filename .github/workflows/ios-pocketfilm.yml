@@ -1,0 +1,89 @@
+name: Build PocketFilm for iPhone
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: Run the Metal / export tests on an iPhone simulator
+        type: boolean
+        default: true
+      runner:
+        description: macOS runner (use xcode-27 if the default Xcode is too old)
+        type: choice
+        options:
+          - macos-latest
+          - xcode-27
+        default: xcode-27
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pocketfilm-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Record toolchain
+        run: |
+          mkdir -p ios/build/artifacts
+          xcodebuild -version | tee ios/build/artifacts/toolchain.txt
+          xcodebuild -showsdks | tee -a ios/build/artifacts/toolchain.txt
+
+      - name: Validate source and resources
+        run: |
+          python3 ios/Tools/gen-project.py --check
+          python3 ios/Tools/validate-port.py
+
+      - name: Ensure Metal compiler is installed
+        run: |
+          xcrun -sdk iphoneos metal --version || xcodebuild -downloadComponent MetalToolchain
+
+      - name: Compile iPhone app and package unsigned IPA
+        run: bash ios/Tools/cloud-build.sh
+
+      - name: Run simulator tests
+        if: ${{ inputs.run_tests }}
+        run: |
+          set -euo pipefail
+          simulator_id=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          phones = [d for runtime, group in devices.items() if ".iOS-" in runtime
+                    for d in group if d.get("isAvailable") and d["name"].startswith("iPhone")]
+          if not phones: raise SystemExit("No available iPhone simulator; install a runtime or choose another runner")
+          print(phones[0]["udid"])
+          ')
+          xcodebuild -project ios/PocketFilm.xcodeproj -scheme PocketFilm \
+            -configuration Debug -destination "platform=iOS Simulator,id=$simulator_id" \
+            -derivedDataPath ios/build/SimulatorData \
+            -resultBundlePath ios/build/artifacts/PocketFilmTests.xcresult \
+            CODE_SIGNING_ALLOWED=NO test 2>&1 | tee ios/build/artifacts/simulator-tests.log
+
+      - name: Upload build and diagnostic files
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketFilm-iPhone-${{ github.run_number }}
+          path: ios/build/artifacts/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Explain installation status
+        if: ${{ always() }}
+        run: |
+          {
+            echo '## PocketFilm iPhone build'
+            echo 'The artifact contains build logs and, only if device compilation succeeded, an unsigned IPA.'
+            echo 'An unsigned IPA cannot be installed directly. Sign it locally on Windows with your own Apple account.'
+            echo 'A red simulator test step is a failed test run, even if an IPA artifact exists.'
+            echo 'Never put Apple account passwords or verification codes in this workflow or repository.'
+          } >> "$GITHUB_STEP_SUMMARY"

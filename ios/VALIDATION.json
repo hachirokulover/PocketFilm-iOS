@@ -1,0 +1,35 @@
+{
+  "upstream_commit": "02d82b56cf65f0f8e802a708612edc4e9a4790af",
+  "changed_upstream_files": [
+    "engine/src/gpu/metal_gpu.cpp"
+  ],
+  "unmodified": [
+    "all engine profiles and baked constants",
+    "all engine Metal shaders",
+    "macOS app sources and project"
+  ],
+  "passed": [
+    "iOS Xcode project regeneration and --check (Python 3.10)",
+    "engine wire key and numeric-range validation against upstream params.cpp",
+    "camera/photo permission usage strings and portrait configuration",
+    "0.3 selectable native-engine film borders, gate crop, full-frame executor and stale-export guard added (not device-tested)",
+    "all ten iOS film-border wire formats and gate ratios agree with upstream overscan.cpp",
+    "34 bundled JSON profiles, 20 available film/paper pairs",
+    "license and binary resource presence",
+    "14 Swift files parsed with tree-sitter-swift (syntax only)",
+    "3 shell scripts parsed with tree-sitter-bash (syntax only)",
+    "manual GitHub Actions workflow YAML parsed; cloud execution has not run",
+    "130 Xcode project objects parsed with openstep-parser; referenced sources exist",
+    "upstream archive comparison: only metal_gpu.cpp differs outside ios/"
+  ],
+  "regression_check": "Validator rejected preview_long_edge=480 against upstream minimum 800; passed after fixing the wire value. Live film preview removed in version 0.2; photo resize uses exact integer bounds.",
+  "not_run": [
+    "Xcode/Swift type checking and linking",
+    "iOS and Simulator Metal compilation",
+    "thirteen XCTest cases",
+    "iPhone RAW capture, film border output, orientation, preview/RAW matching, performance and memory",
+    "macOS engine parity harnesses",
+    "GitHub Actions cloud build and IPA packaging"
+  ],
+  "reason": "Execution host is Windows and has no Xcode, Apple SDKs or connected iPhone."
+}
