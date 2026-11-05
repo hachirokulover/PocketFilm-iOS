@@ -2,7 +2,11 @@
 
 基于 [SpektraLab](https://github.com/JamesQiu2005/SpektraLab) 的非官方 iPhone RAW 胶片相机移植。
 
-这是 iOS 构建所需的源码子集。使用原 C++/Metal 光谱引擎；当前版本尚待首次 Xcode 编译和真机验证。
+这是 iOS 构建所需的源码子集。使用原 C++/Metal 光谱引擎；当前版本已编译完成，并已在真机验证。
+
+真机验证截图如下：
+<img width="1206" height="2622" alt="fd461a0691dba6b598251a2308a1b61a" src="https://github.com/user-attachments/assets/244821b3-9bd6-4e08-8733-c68b96775a6c" />
+真机型号为iPhone18Pro，iOS版本27.2。镜头切换及可变光圈可正常调用。
 
 ## 云端编译
 
@@ -12,7 +16,6 @@
 4. 完成后下载本次运行的 `PocketFilm-iPhone-编号` artifact。
 5. 如果设备编译成功，里面包含 `PocketFilm-unsigned.ipa`。它需要在 Windows 上用自己的账号签名后安装。
 
-未签名 IPA 不能直接安装；首次云编译可能需要修复编译错误。即使生成 IPA，红色测试步骤仍表示测试失败。
 
 详细说明：[Windows 云编译与安装](ios/WINDOWS-CLOUD.zh-CN.md)、[移植与验证说明](ios/README.zh-CN.md)。
 
