@@ -15,6 +15,8 @@ struct CameraPreview: UIViewRepresentable {
     var onFocus: (CGPoint) -> Void = { _ in }
     func makeUIView(context: Context) -> PreviewHost {
         let view = PreviewHost()
+        // CameraArrangement preserves this layer when the layout axis changes.
+        // Attach once; never reattach a running session just to rotate the UI.
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspect
         view.onFocus = onFocus
@@ -23,7 +25,12 @@ struct CameraPreview: UIViewRepresentable {
     func updateUIView(_ view: PreviewHost, context: Context) {
         view.guide = guide
         view.onFocus = onFocus
+        // Also retry after camera setup/lens switching creates a connection.
+        view.scheduleRotationUpdate()
         view.setNeedsLayout()
+    }
+    static func dismantleUIView(_ view: PreviewHost, coordinator: ()) {
+        view.disconnect()
     }
 }
 
@@ -32,6 +39,8 @@ final class PreviewHost: UIView {
     var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
     var guide: CompositionGuide = .thirds
     var onFocus: ((CGPoint) -> Void)?
+    private var requestedAngle: CGFloat?
+    private var rotationUpdate: DispatchWorkItem?
     private let guideLayer = CAShapeLayer()
     private let focusLayer = CAShapeLayer()
     private var hideFocus: DispatchWorkItem?
@@ -54,8 +63,15 @@ final class PreviewHost: UIView {
         accessibilityLabel = "相机取景，点击画面选择对焦点"
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }
+    func disconnect() {
+        hideFocus?.cancel()
+        rotationUpdate?.cancel()
+        previewLayer.session = nil
+        onFocus = nil
+    }
     override func didMoveToWindow() {
         super.didMoveToWindow()
+        scheduleRotationUpdate()
         setNeedsLayout()
     }
 
@@ -80,11 +96,13 @@ final class PreviewHost: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         let angle = CameraOrientation.previewAngle(for: window?.windowScene?.interfaceOrientation ?? .portrait)
-        if let connection = previewLayer.connection, connection.isVideoRotationAngleSupported(angle),
-           connection.videoRotationAngle != angle {
-            connection.videoRotationAngle = angle
+        if requestedAngle != angle {
             focusLayer.opacity = 0
+            scheduleRotationUpdate()
         }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
         guideLayer.frame = bounds
         let video = previewLayer.layerRectConverted(
             fromMetadataOutputRect: CGRect(x: 0, y: 0, width: 1, height: 1)).intersection(bounds)
@@ -108,5 +126,24 @@ final class PreviewHost: UIView {
             }
         }
         guideLayer.path = path.cgPath
+    }
+
+    func scheduleRotationUpdate() {
+        let angle = CameraOrientation.previewAngle(for: window?.windowScene?.interfaceOrientation ?? .portrait)
+        requestedAngle = angle
+        rotationUpdate?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, let scene = self.window?.windowScene,
+                  let connection = self.previewLayer.connection else { return }
+            let currentAngle = CameraOrientation.previewAngle(for: scene.interfaceOrientation)
+            guard connection.isVideoRotationAngleSupported(currentAngle),
+                  connection.videoRotationAngle != currentAngle else { return }
+            // Preview-layer work stays on main, but outside UIKit/SwiftUI's
+            // synchronous layout transaction. Never wait on the camera queue.
+            connection.videoRotationAngle = currentAngle
+            self.setNeedsLayout()
+        }
+        rotationUpdate = work
+        DispatchQueue.main.async(execute: work)
     }
 }

@@ -12,22 +12,15 @@ struct CameraView: View {
             let landscape = geometry.size.width > geometry.size.height
             VStack(spacing: 8) {
                 header
-                if landscape {
-                    HStack(spacing: 12) {
-                        cameraPreview(landscape: true)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        VStack(spacing: 8) {
-                            controls
-                            shutter
-                        }.frame(width: min(340, geometry.size.width * 0.42))
-                    }
-                } else {
-                    cameraPreview(landscape: false)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    controls.frame(maxHeight: min(260, geometry.size.height * 0.32))
-                    shutter
-                    footer
-                }
+                CameraArrangement(landscape: landscape,
+                    panelWidth: min(340, geometry.size.width * 0.42),
+                    preview: cameraPreview(landscape: landscape)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity),
+                    panel: VStack(spacing: 8) {
+                        controls.frame(maxHeight: landscape ? .infinity : min(260, geometry.size.height * 0.32))
+                        shutter
+                        footer.frame(height: landscape ? 0 : nil).opacity(landscape ? 0 : 1)
+                    })
             }
         }
         .onChange(of: model.apertureSelection) { _, _ in model.changeAperture() }
