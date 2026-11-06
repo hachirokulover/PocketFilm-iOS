@@ -19,12 +19,13 @@ final class RenderWorker {
         return created
     }
 
-    func capture(raw: Data, recipe: FilmRecipe, completion: @escaping (CaptureItem?, Result<FilmFrame, Error>) -> Void) {
+    func capture(raw: Data, recipe: FilmRecipe, capturedAt: Date = Date(),
+                 completion: @escaping (CaptureItem?, Result<FilmFrame, Error>) -> Void) {
         queue.async {
             autoreleasepool {
                 var item: CaptureItem?
                 let result = Result<FilmFrame, Error> {
-                    let saved = try CaptureStore.prepare(raw: raw, recipe: recipe)
+                    let saved = try CaptureStore.prepare(raw: raw, recipe: recipe, capturedAt: capturedAt)
                     item = saved
                     return try self.develop(saved, recipe: recipe)
                 }
@@ -44,7 +45,7 @@ final class RenderWorker {
         }
     }
 
-    func importRAW(_ url: URL, recipe: FilmRecipe,
+    func importRAW(_ url: URL, recipe: FilmRecipe, importedAt: Date = Date(),
                    completion: @escaping (CaptureItem?, Result<FilmFrame, Error>) -> Void) {
         queue.async {
             autoreleasepool {
@@ -53,7 +54,7 @@ final class RenderWorker {
                     let access = url.startAccessingSecurityScopedResource()
                     defer { if access { url.stopAccessingSecurityScopedResource() } }
                     let bytes = try Data(contentsOf: url)
-                    let saved = try CaptureStore.prepare(raw: bytes, recipe: recipe, ext: url.pathExtension)
+                    let saved = try CaptureStore.prepare(raw: bytes, recipe: recipe, ext: url.pathExtension, capturedAt: importedAt)
                     item = saved
                     return try self.develop(saved, recipe: recipe)
                 }
@@ -74,7 +75,27 @@ final class RenderWorker {
         // survive failed reprocessing; the original RAW is never overwritten.
         try jpeg.write(to: item.jpeg, options: .atomic)
         try CaptureStore.write(recipe: recipe, for: item)
+        // A missing thumbnail must not turn an otherwise saved photo into an
+        // error. The library can retry its bounded ImageIO preview later.
+        try? CaptureStore.updateThumbnail(for: item)
         return result
+    }
+
+    func loadLibrary(completion: @escaping ([CaptureItem]) -> Void) {
+        queue.async {
+            let items = CaptureStore.recent()
+            DispatchQueue.main.async { completion(items) }
+        }
+    }
+
+    func delete(_ items: [CaptureItem], completion: @escaping (Result<Void, Error>, [CaptureItem]) -> Void) {
+        // Shares the renderer's queue: a deleted RAW cannot be written back by
+        // a pending develop. CameraModel also blocks deletion during Photos IO.
+        queue.async {
+            let result = Result { try CaptureStore.delete(items) }
+            let remaining = CaptureStore.recent()
+            DispatchQueue.main.async { completion(result, remaining) }
+        }
     }
 
     func memoryWarning() {

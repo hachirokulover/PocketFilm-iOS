@@ -38,7 +38,7 @@ bash ios/Tools/verify-on-mac.sh 'platform=iOS Simulator,id=你的模拟器UDID'
 
 图 2 的缩放、无效 RAW 与模拟器兼容修改详见 CHANGES-0.2.zh-CN.md。没有具体崩溃日志，不能确认模拟器修复覆盖朋友遇到的全部问题；测试需重新执行。
 
-本地存储位置：Documents/Captures/<UUID>/，包含 source.dng（或导入文件的原后缀）、film.jpg、recipe.json。相册未授权也保留本地文件。
+本地底片按日期时间命名并显示缩略图，支持左滑、编辑或长按删除。本地存储位置：Documents/Captures/年月日_时分秒毫秒/，包含带日期时间的 RAW、胶片 JPEG、recipe.json、capture.json 与 thumbnail.jpg；同一时间重复保存自动增加序号，避免覆盖。旧版 UUID 目录继续兼容。相册未授权也保留本地文件。详情见 [底片库说明](CHANGES-library.zh-CN.md)。
 
 ## 来源与许可
 

@@ -20,6 +20,7 @@ final class CameraModel {
     private let camera = CameraService()
     private let worker = RenderWorker()
     private var active = false
+    private var libraryGeneration = 0
     private var captureRotationAngle: CGFloat = 90
     @ObservationIgnored private var orientationObserver: NSObjectProtocol?
     var guide = CompositionGuide.thirds
@@ -50,7 +51,7 @@ final class CameraModel {
         camera.onInterrupted = { [weak self] text in
             Task { @MainActor in self?.status = text }
         }
-        captures = CaptureStore.recent()
+        refreshLibrary()
         worker.warmUp { [weak self] result in
             Task { @MainActor in
                 switch result {
@@ -91,13 +92,14 @@ final class CameraModel {
         beginProcessing("正在拍摄 RAW…")
         recipe.border.frameSeed = Int.random(in: 1...Int(Int32.max))
         let snapshot = recipe
+        let capturedAt = Date()
         camera.capture(preferProRAW: preferProRAW, rotationAngle: captureRotationAngle) { [weak self] result in
             Task { @MainActor in
                 guard let self else { return }
                 switch result {
                 case .success(let bytes):
                     self.status = "正在保存原片并进行胶片显影…"
-                    self.worker.capture(raw: bytes, recipe: snapshot, completion: self.completion())
+                    self.worker.capture(raw: bytes, recipe: snapshot, capturedAt: capturedAt, completion: self.completion())
                 case .failure(let error): self.finish(nil, result: .failure(error))
                 }
             }
@@ -170,7 +172,7 @@ final class CameraModel {
 
     private func finish(_ item: CaptureItem?, result: Result<FilmFrame, Error>) {
         isProcessing = false
-        captures = CaptureStore.recent()
+        refreshLibrary()
         if let item { selectedCapture = item }
         switch result {
         case .success(let frame):
@@ -192,6 +194,40 @@ final class CameraModel {
         imageRevision += 1
         status = "已打开本地底片，可调整片边后重新显影或保存"
         showingResult = true
+    }
+    func refreshLibrary() {
+        libraryGeneration += 1
+        let generation = libraryGeneration
+        worker.loadLibrary { [weak self] items in
+            Task { @MainActor in
+                guard let self, self.libraryGeneration == generation else { return }
+                self.captures = items
+            }
+        }
+    }
+    func deleteCaptures(_ items: [CaptureItem], completion: @escaping (Result<Void, Error>) -> Void = { _ in }) {
+        guard !isProcessing, !items.isEmpty else { return }
+        libraryGeneration += 1
+        beginProcessing("正在删除本地底片…")
+        worker.delete(items) { [weak self] result, remaining in
+            Task { @MainActor in
+                guard let self else { return }
+                self.libraryGeneration += 1
+                self.captures = remaining
+                self.isProcessing = false
+                if let selected = self.selectedCapture, !remaining.contains(where: { $0.id == selected.id }) {
+                    self.selectedCapture = nil
+                    self.showingResult = false
+                }
+                switch result {
+                case .success: self.status = "已删除所选本地底片"
+                case .failure(let error):
+                    self.status = "部分底片未删除，请重试"
+                    self.status += "：\(error.localizedDescription)"
+                }
+                completion(result)
+            }
+        }
     }
     func closeResult() { showingResult = false }
     func memoryWarning() { worker.memoryWarning() }

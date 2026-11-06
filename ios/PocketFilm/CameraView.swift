@@ -32,23 +32,9 @@ struct CameraView: View {
             }
         }
         .sheet(isPresented: $library) {
-            NavigationStack {
-                List(model.captures) { item in
-                    Button {
-                        library = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { model.show(item) }
-                    } label: {
-                        HStack {
-                            Image(systemName: "photo").font(.title2)
-                            VStack(alignment: .leading) {
-                                Text(item.id.prefix(8)).font(.headline)
-                                Text(FileManager.default.fileExists(atPath: item.jpeg.path) ? "RAW 与成片" : "RAW 已保留，可重新显影")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }.navigationTitle("本地底片")
-                    .toolbar { Button("完成") { library = false } }
+            CaptureLibraryView(model: model) { item in
+                library = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { model.show(item) }
             }
         }
         .sheet(isPresented: $model.showingResult, onDismiss: { model.closeResult() }) {
