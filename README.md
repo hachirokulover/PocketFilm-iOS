@@ -1,4 +1,7 @@
-# PocketFilm iOS
+<div align="center">
+  <h1>PocketFilm iOS</h1>
+  <img width="125" height="125" alt="PocketFilm 图标" src="https://github.com/user-attachments/assets/883d45e4-1e76-45f8-83e2-aecf17aea3c8" />
+</div>
 
 基于 [SpektraLab](https://github.com/JamesQiu2005/SpektraLab) 的非官方 iPhone RAW 胶片相机移植。
 
@@ -6,7 +9,9 @@
 
 真机验证截图如下：
 
+<div align="center">
 <img width="120" height="262" alt="fd461a0691dba6b598251a2308a1b61a" src="https://github.com/user-attachments/assets/244821b3-9bd6-4e08-8733-c68b96775a6c" />
+</div>
 
 真机型号为iPhone18Pro，iOS版本27.2。镜头切换及可变光圈可正常调用。
 
