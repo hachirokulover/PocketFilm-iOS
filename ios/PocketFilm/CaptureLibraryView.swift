@@ -76,7 +76,7 @@ private struct CaptureLibraryRow: View {
             }.frame(width: 64, height: 64).clipShape(RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 5) {
                 Text(item.displayName).font(.headline.monospacedDigit()).foregroundStyle(.primary)
-                Text(FileManager.default.fileExists(atPath: item.jpeg.path) ? "RAW 与成片" : "RAW 已保留，可重新显影")
+                Text(item.hasDevelopedImage ? "RAW 与成片" : "RAW 已保留，可重新显影")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

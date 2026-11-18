@@ -3,9 +3,57 @@ import CoreImage
 import Metal
 import UIKit
 import ImageIO
+import UniformTypeIdentifiers
 @testable import PocketFilm
 
 final class SurfaceAgreementTests: XCTestCase {
+    func testDisplayP3JPEGPreservesGreenOutsideSRGB() throws {
+        try verifyWideGamutExport(.jpeg)
+    }
+
+    func testDisplayP3HEIFPreservesGreenOutsideSRGB() throws {
+        let types = CGImageDestinationCopyTypeIdentifiers() as? [String] ?? []
+        try XCTSkipUnless(types.contains(UTType.heic.identifier), "This simulator does not advertise HEIC encoding.")
+        try verifyWideGamutExport(.heif)
+    }
+
+    private func verifyWideGamutExport(_ format: ExportFormat) throws {
+        let engine = try FilmEngine()
+        let width = 256, height = 192
+        let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Unorm,
+            width: width, height: height, mipmapped: false)
+        desc.storageMode = .shared
+        desc.usage = .shaderRead
+        let texture = try XCTUnwrap(engine.device.makeTexture(descriptor: desc))
+        var rgba = [UInt16](repeating: 0, count: width * height * 4)
+        for i in stride(from: 0, to: rgba.count, by: 4) {
+            rgba[i + 1] = .max
+            rgba[i + 3] = .max
+        }
+        rgba.withUnsafeBytes {
+            texture.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0,
+                withBytes: $0.baseAddress!, bytesPerRow: width * 8)
+        }
+        let p3 = ExportColorSpace.displayP3.colorSpace
+        let frame = FilmFrame(texture: texture, elapsedMS: 0, colorSpace: p3)
+        let data = try engine.encode(frame, settings: ExportSettings(format: format, colorSpace: .displayP3))
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        let type = try XCTUnwrap(CGImageSourceGetType(source))
+        XCTAssertEqual(type as String, format.contentType.identifier)
+        let image = try XCTUnwrap(CIImage(data: data))
+        XCTAssertEqual(image.extent.size, CGSize(width: CGFloat(width), height: CGFloat(height)))
+        var pixel = [UInt8](repeating: 0, count: 4)
+        pixel.withUnsafeMutableBytes {
+            engine.context.render(image, toBitmap: $0.baseAddress!, rowBytes: 4,
+                bounds: CGRect(x: 128, y: 96, width: 1, height: 1), format: .RGBA8, colorSpace: p3)
+        }
+        // If the encoder clips or tags the green as sRGB, decoding it back
+        // into P3 introduces a substantial red channel.
+        XCTAssertLessThan(pixel[0], 30)
+        XCTAssertGreaterThan(pixel[1], 235)
+        XCTAssertLessThan(pixel[2], 30)
+    }
+
     func testCanvasAndExportAgreeOnAsymmetricFrame() throws {
         let engine = try FilmEngine()
         let device = engine.device
@@ -53,7 +101,7 @@ final class SurfaceAgreementTests: XCTestCase {
         canvas.withUnsafeMutableBytes { display.getBytes($0.baseAddress!, bytesPerRow: 64,
             from: MTLRegionMake2D(0, 0, 16, 16), mipmapLevel: 0) }
 
-        let jpegData = try engine.jpeg(FilmFrame(texture: source, elapsedMS: 0, colorSpace: FilmEngine.outputSpace))
+        let jpegData = try engine.encode(FilmFrame(texture: source, elapsedMS: 0, colorSpace: FilmEngine.outputSpace), settings: .legacy)
         let jpeg = try XCTUnwrap(CIImage(data: jpegData))
         var exported = [UInt8](repeating: 0, count: 16 * 16 * 4)
         exported.withUnsafeMutableBytes { engine.context.render(jpeg, toBitmap: $0.baseAddress!, rowBytes: 64,
@@ -75,7 +123,7 @@ final class SurfaceAgreementTests: XCTestCase {
         XCTAssertThrowsError(try FilmEngine.validateRAW(item.source))
         XCTAssertEqual(try Data(contentsOf: item.source), original)
         XCTAssertTrue(FileManager.default.fileExists(atPath: item.recipeURL.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: item.jpeg.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: item.developed.path))
     }
 
     func testFilmBorderResultSheetReadsTheExactSavedJPEG() throws {
@@ -94,20 +142,19 @@ final class SurfaceAgreementTests: XCTestCase {
         let frame = try engine.render(red.composited(over: blue), recipe: recipe, preview: false)
         let crop = recipe.border.cropRect(in: CGRect(x: 0, y: 0, width: 320, height: 240))
         XCTAssertTrue(frame.texture.width > Int(crop.width) || frame.texture.height > Int(crop.height))
-        let exported = try engine.jpeg(frame)
-        try exported.write(to: item.jpeg, options: .atomic)
-        try CaptureStore.write(recipe: recipe, for: item)
+        let exported = try engine.encode(frame, settings: recipe.export)
+        let savedItem = try CaptureStore.writeDevelopedImage(exported, recipe: recipe, for: item)
         // The result sheet uses UIImage(contentsOfFile:); Photos and ShareLink
         // consume this very file, without a separate border or display render.
-        let displayed = try XCTUnwrap(UIImage(contentsOfFile: item.jpeg.path)?.cgImage)
-        let savedSource = try XCTUnwrap(CGImageSourceCreateWithURL(item.jpeg as CFURL, nil))
+        let displayed = try XCTUnwrap(UIImage(contentsOfFile: savedItem.developed.path)?.cgImage)
+        let savedSource = try XCTUnwrap(CGImageSourceCreateWithURL(savedItem.developed as CFURL, nil))
         let saved = try XCTUnwrap(CGImageSourceCreateImageAtIndex(savedSource, 0, nil))
         XCTAssertEqual(displayed.width, frame.texture.width)
         XCTAssertEqual(displayed.height, frame.texture.height)
         XCTAssertEqual(saved.width, displayed.width)
         XCTAssertEqual(saved.height, displayed.height)
-        XCTAssertEqual(try Data(contentsOf: item.jpeg), exported)
-        XCTAssertTrue(CaptureStore.isCurrent(item, recipe: recipe))
+        XCTAssertEqual(try Data(contentsOf: savedItem.developed), exported)
+        XCTAssertTrue(CaptureStore.isCurrent(savedItem, recipe: recipe))
         XCTAssertEqual(try Data(contentsOf: item.source), rawBytes)
     }
 }

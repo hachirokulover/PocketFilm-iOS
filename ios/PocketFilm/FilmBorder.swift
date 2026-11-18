@@ -62,7 +62,7 @@ struct FilmBorderSettings: Codable, Equatable {
     var cameraSeed = 1
     var frameSeed = 1
 
-    // Only the developed JPEG is cut. RAW and native viewfinder stay intact.
+    // Only the developed image uses the film gate crop.
     func cropRect(in extent: CGRect) -> CGRect {
         guard enabled, !extent.isEmpty, !extent.isInfinite else { return extent }
         let ratio = extent.width >= extent.height ? format.gateRatio : 1 / format.gateRatio

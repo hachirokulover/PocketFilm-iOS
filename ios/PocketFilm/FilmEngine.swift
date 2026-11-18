@@ -17,7 +17,7 @@ final class FilmEngine {
     let device: MTLDevice
     let context: CIContext
     private let handle: OpaquePointer
-    static let outputSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    static let outputSpace = ExportColorSpace.sRGB.colorSpace
     static let linearProPhoto: CGColorSpace = {
         let white: [CGFloat] = [0.9642, 1, 0.8249]
         let black: [CGFloat] = [0, 0, 0]
@@ -173,8 +173,8 @@ final class FilmEngine {
         guard let reply, let replyData = String(cString: reply).data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: replyData) as? [String: Any],
               let params = json["params"] as? [String: Any],
-              params["output_color_space"] as? String == "sRGB",
-              params["output_cctf_encoding"] as? Bool == true else {
+              params["output_color_space"] as? String == recipe.export.colorSpace.engineName,
+              params["output_cctf_encoding"] as? Bool == recipe.export.colorSpace.engineEncodesTransfer else {
             throw PocketFailure.message("引擎输出颜色空间与应用约定不同。")
         }
         var result = spk_result()
@@ -186,10 +186,10 @@ final class FilmEngine {
         // +1 belongs to us. ARC now owns it; spk_result_free would double-free.
         let texture = Unmanaged<AnyObject>.fromOpaque(opaque).takeRetainedValue() as! MTLTexture
         return FilmFrame(texture: texture, elapsedMS: (CFAbsoluteTimeGetCurrent() - start) * 1000,
-                         colorSpace: Self.outputSpace)
+                         colorSpace: recipe.export.colorSpace.engineColorSpace)
     }
 
-    func jpeg(_ frame: FilmFrame) throws -> Data {
+    func encode(_ frame: FilmFrame, settings: ExportSettings) throws -> Data {
         guard let image = CIImage(mtlTexture: frame.texture, options: [.colorSpace: frame.colorSpace]) else {
             throw PocketFailure.message("无法读取成片纹理。")
         }
@@ -197,11 +197,25 @@ final class FilmEngine {
         // uses a bottom-left origin; flip only on this route to ImageIO.
         let flipped = image.transformed(by: CGAffineTransform(translationX: 0, y: image.extent.height)
             .scaledBy(x: 1, y: -1))
-        guard let bytes = context.jpegRepresentation(of: flipped, colorSpace: frame.colorSpace,
-            options: [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.95]) else {
-            throw PocketFailure.message("JPEG 编码失败。")
+        let quality = CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String)
+        let options: [CIImageRepresentationOption: Any] = [quality: settings.compressionQuality]
+        let destination = settings.colorSpace.colorSpace
+        let encoded: Data?
+        switch settings.format {
+        case .jpeg:
+            encoded = context.jpegRepresentation(of: flipped, colorSpace: destination, options: options)
+        case .heif:
+            encoded = context.heifRepresentation(of: flipped, format: .RGBA8, colorSpace: destination, options: options)
         }
-        return bytes
+        guard let encoded else {
+            throw PocketFailure.message("无法生成 \(settings.colorSpace.title) \(settings.format.title) 成片。请尝试其他导出设置。")
+        }
+        guard let source = CGImageSourceCreateWithData(encoded as CFData, nil),
+              let type = CGImageSourceGetType(source),
+              let contentType = UTType(type as String), contentType.conforms(to: settings.format.contentType) else {
+            throw PocketFailure.message("系统返回的成片格式与导出设置不一致。")
+        }
+        return encoded
     }
 
     func clearCaches() { context.clearCaches() }

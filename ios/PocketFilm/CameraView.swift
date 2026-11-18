@@ -41,7 +41,7 @@ struct CameraView: View {
             if let item = model.selectedCapture { CaptureView(model: model, item: item) }
         }
         .sheet(isPresented: $about) { LicensesView() }
-        .alert("提示", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+        .alert("提示", isPresented: Binding(get: { !model.showingResult && model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("好", role: .cancel) { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
     }
@@ -118,9 +118,8 @@ struct CameraView: View {
                         } else { Text("当前镜头固定光圈").font(.caption).foregroundStyle(.secondary) }
                     }
                 }
-                Picker("成片长边", selection: $model.recipe.maxPhotoEdge) {
-                    Text("2048px").tag(2048); Text("4032px").tag(4032)
-                }.pickerStyle(.segmented)
+                ExportControls(settings: $model.recipe.export, maxPhotoEdge: $model.recipe.maxPhotoEdge,
+                    hasFilmBorder: model.recipe.border.enabled)
                 HStack {
                     Picker("RAW 格式", selection: $model.preferProRAW) {
                         Text("ProRAW").tag(true).disabled(model.capabilities?.supportsProRAW != true)
@@ -144,7 +143,7 @@ struct CameraView: View {
                     }.disabled(!model.canCapture).opacity(model.canCapture ? 1 : 0.35)
                         .accessibilityLabel("拍摄 RAW 并显影")
                     Spacer()
-                    Text("RAW\n+ JPEG").font(.caption2.monospaced()).multilineTextAlignment(.center)
+                    Text("RAW\n+ \(model.recipe.export.format.title)").font(.caption2.monospaced()).multilineTextAlignment(.center)
                 }.padding(.vertical, 4)
     }
 
@@ -174,12 +173,14 @@ private struct CaptureView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    if let image = UIImage(contentsOfFile: item.jpeg.path) {
+                    if let image = UIImage(contentsOfFile: item.developed.path) {
                         Image(uiImage: image).resizable().scaledToFit().id(model.imageRevision)
                     } else {
                         ContentUnavailableView("原始 RAW 已保留", systemImage: "doc", description: Text("可以分享原片，或再次尝试显影。"))
                     }
                     Text(model.status).font(.caption).foregroundStyle(.secondary)
+                    ExportControls(settings: $model.recipe.export, maxPhotoEdge: $model.recipe.maxPhotoEdge,
+                        hasFilmBorder: model.recipe.border.enabled, expanded: true)
                     FilmBorderControls(settings: $model.recipe.border)
                     if !current {
                         Text("设置已改变或尚未生成成片。可先重新显影预览；保存时会自动应用当前设置。")
@@ -190,8 +191,10 @@ private struct CaptureView: View {
                         model.saveToPhotos(item) { result in
                             saving = false
                             switch result {
-                            case .success: saveMessage = "已作为两张照片保存：原始 RAW 和应用当前片边设置的胶片成片。"
-                            case .failure(let error): saveMessage = error.localizedDescription
+                            case .success: saveMessage = "原始 RAW 和 \(model.recipe.export.format.title) 成片已分别保存到相册。"
+                            case .failure(let error):
+                                model.errorMessage = nil
+                                saveMessage = error.localizedDescription
                             }
                         }
                     }.buttonStyle(.borderedProminent)
@@ -221,9 +224,12 @@ private struct CaptureView: View {
                 .toolbar { Button("完成") { model.closeResult() }.disabled(model.isProcessing || saving) }
                 .interactiveDismissDisabled(model.isProcessing || saving)
                 .overlay { if model.isProcessing { ProgressView().padding().background(.regularMaterial) } }
-                .alert("保存结果", isPresented: Binding(get: { saveMessage != nil }, set: { if !$0 { saveMessage = nil } })) {
-                    Button("好") { saveMessage = nil }
-                } message: { Text(saveMessage ?? "") }
+                .alert("成片", isPresented: Binding(
+                    get: { saveMessage != nil || model.errorMessage != nil },
+                    set: { if !$0 { saveMessage = nil; model.errorMessage = nil } }
+                )) {
+                    Button("好") { saveMessage = nil; model.errorMessage = nil }
+                } message: { Text(saveMessage ?? model.errorMessage ?? "") }
         }
     }
 }

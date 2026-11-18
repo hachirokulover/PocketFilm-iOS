@@ -6,13 +6,13 @@ import UniformTypeIdentifiers
 struct CaptureItem: Identifiable {
     let folder: URL
     let source: URL
-    let jpeg: URL
+    let developed: URL
     let capturedAt: Date
     let displayName: String
-    init(folder: URL, source: URL, jpeg: URL, capturedAt: Date = Date(), displayName: String? = nil) {
+    init(folder: URL, source: URL, developed: URL, capturedAt: Date = Date(), displayName: String? = nil) {
         self.folder = folder
         self.source = source
-        self.jpeg = jpeg
+        self.developed = developed
         self.capturedAt = capturedAt
         self.displayName = displayName ?? CaptureStore.dateName(capturedAt)
     }
@@ -20,7 +20,15 @@ struct CaptureItem: Identifiable {
     var recipeURL: URL { folder.appendingPathComponent("recipe.json") }
     var thumbnailURL: URL { folder.appendingPathComponent("thumbnail.jpg") }
     var shareURLs: [URL] {
-        [source, jpeg, recipeURL].filter { FileManager.default.fileExists(atPath: $0.path) }
+        [source, developed, recipeURL].filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+    var developedStem: String {
+        source.deletingPathExtension().lastPathComponent == "source" ? "film" : id + "_Film"
+    }
+    var hasDevelopedImage: Bool { FileManager.default.fileExists(atPath: developed.path) }
+
+    func withDevelopedImage(_ url: URL) -> CaptureItem {
+        CaptureItem(folder: folder, source: source, developed: url, capturedAt: capturedAt, displayName: displayName)
     }
 }
 
@@ -28,6 +36,28 @@ enum CaptureStore {
     private struct CaptureInfo: Codable {
         let capturedAt: Date
         let displayName: String
+    }
+    // Keep the recipe at the top level for existing imports and readers. The
+    // output filename is committed together with its settings in one JSON write.
+    private struct StoredRecipe: Codable {
+        enum CodingKeys: String, CodingKey { case developedFile }
+        let recipe: FilmRecipe
+        let developedFile: String?
+
+        init(recipe: FilmRecipe, developedFile: String?) {
+            self.recipe = recipe
+            self.developedFile = developedFile
+        }
+        init(from decoder: Decoder) throws {
+            recipe = try FilmRecipe(from: decoder)
+            let fields = try decoder.container(keyedBy: CodingKeys.self)
+            developedFile = try fields.decodeIfPresent(String.self, forKey: .developedFile)
+        }
+        func encode(to encoder: Encoder) throws {
+            try recipe.encode(to: encoder)
+            var fields = encoder.container(keyedBy: CodingKeys.self)
+            try fields.encodeIfPresent(developedFile, forKey: .developedFile)
+        }
     }
     private static let allocationLock = NSLock()
     private static let thumbnailLock = NSLock()
@@ -55,7 +85,8 @@ enum CaptureStore {
         // can all fail without losing the camera's DNG.
         try raw.write(to: source, options: .atomic)
         let item = CaptureItem(folder: folder, source: source,
-            jpeg: folder.appendingPathComponent(stem + "_Film.jpg"), capturedAt: capturedAt)
+            developed: folder.appendingPathComponent(stem + "_Film").appendingPathExtension(recipe.export.format.fileExtension),
+            capturedAt: capturedAt)
         let info = CaptureInfo(capturedAt: capturedAt, displayName: item.displayName)
         try JSONEncoder().encode(info).write(to: folder.appendingPathComponent("capture.json"), options: .atomic)
         try write(recipe: recipe, for: item)
@@ -79,19 +110,51 @@ enum CaptureStore {
         return folder
     }
 
-    static func write(recipe: FilmRecipe, for item: CaptureItem) throws {
+    static func write(recipe: FilmRecipe, for item: CaptureItem, developedFile: String? = nil) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(recipe).write(to: item.recipeURL, options: .atomic)
+        let stored = StoredRecipe(recipe: recipe, developedFile: developedFile)
+        try encoder.encode(stored).write(to: item.recipeURL, options: .atomic)
     }
 
     static func readRecipe(for item: CaptureItem) -> FilmRecipe? {
+        readStoredRecipe(for: item)?.recipe
+    }
+
+    private static func readStoredRecipe(for item: CaptureItem) -> StoredRecipe? {
         guard let data = try? Data(contentsOf: item.recipeURL) else { return nil }
-        return try? JSONDecoder().decode(FilmRecipe.self, from: data)
+        return try? JSONDecoder().decode(StoredRecipe.self, from: data)
+    }
+
+    static func writeDevelopedImage(_ bytes: Data, recipe: FilmRecipe, for item: CaptureItem) throws -> CaptureItem {
+        let fm = FileManager.default
+        let fileExtension = recipe.export.format.fileExtension
+        let base = item.folder.appendingPathComponent(item.developedStem)
+        var output = base.appendingPathExtension(fileExtension)
+        var index = 1
+        while fm.fileExists(atPath: output.path) {
+            index += 1
+            output = item.folder.appendingPathComponent("\(item.developedStem)_\(index)").appendingPathExtension(fileExtension)
+        }
+        // Keep the previous image reachable until both the new bytes and the
+        // corresponding recipe have been written. A failed save can be retried.
+        try bytes.write(to: output, options: .atomic)
+        do {
+            try write(recipe: recipe, for: item, developedFile: output.lastPathComponent)
+        } catch {
+            try? fm.removeItem(at: output)
+            throw error
+        }
+        if item.developed.path != output.path && item.hasDevelopedImage {
+            try? fm.removeItem(at: item.developed)
+        }
+        return item.withDevelopedImage(output)
     }
 
     static func isCurrent(_ item: CaptureItem, recipe: FilmRecipe) -> Bool {
-        FileManager.default.fileExists(atPath: item.jpeg.path) && readRecipe(for: item) == recipe
+        guard item.hasDevelopedImage, let stored = readStoredRecipe(for: item),
+              stored.recipe == recipe, item.developed.pathExtension == recipe.export.format.fileExtension else { return false }
+        return stored.developedFile.map { $0 == item.developed.lastPathComponent } ?? true
     }
 
     static func recent(baseDirectory: URL? = nil) -> [CaptureItem] {
@@ -110,9 +173,15 @@ enum CaptureStore {
             let info = (try? Data(contentsOf: folder.appendingPathComponent("capture.json")))
                 .flatMap { try? JSONDecoder().decode(CaptureInfo.self, from: $0) }
             let legacy = source.deletingPathExtension().lastPathComponent == "source"
-            let jpeg = folder.appendingPathComponent(legacy ? "film.jpg" : folder.lastPathComponent + "_Film.jpg")
-            return CaptureItem(folder: folder, source: source, jpeg: jpeg,
+            let stem = legacy ? "film" : folder.lastPathComponent + "_Film"
+            let item = CaptureItem(folder: folder, source: source, developed: folder.appendingPathComponent(stem + ".jpg"),
                 capturedAt: info?.capturedAt ?? values.creationDate ?? .distantPast, displayName: info?.displayName)
+            guard let stored = readStoredRecipe(for: item), let filename = stored.developedFile else { return item }
+            guard filename == (filename as NSString).lastPathComponent,
+                  !filename.contains("\\"),
+                  filename.hasPrefix(stem + ".") || filename.hasPrefix(stem + "_"),
+                  (filename as NSString).pathExtension == stored.recipe.export.format.fileExtension else { return item }
+            return item.withDevelopedImage(folder.appendingPathComponent(filename))
         }.sorted {
             $0.capturedAt == $1.capturedAt ? $0.id > $1.id : $0.capturedAt > $1.capturedAt
         }
@@ -155,16 +224,16 @@ enum CaptureStore {
         let fm = FileManager.default
         // Do not recreate a deleted parent when an old row's task completes.
         guard fm.fileExists(atPath: item.folder.path) else { return nil }
-        let hasJPEG = fm.fileExists(atPath: item.jpeg.path)
-        let input = hasJPEG ? item.jpeg : item.source
+        let hasDeveloped = item.hasDevelopedImage
+        let input = hasDeveloped ? item.developed : item.source
         let sourceDate = (try? input.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
         let cachedDate = (try? item.thumbnailURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
         if !force, cachedDate >= sourceDate, let bytes = try? Data(contentsOf: item.thumbnailURL) { return bytes }
         if fm.fileExists(atPath: item.thumbnailURL.path) { try fm.removeItem(at: item.thumbnailURL) }
         guard let source = CGImageSourceCreateWithURL(input as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                kCGImageSourceCreateThumbnailFromImageAlways: hasJPEG,
-                kCGImageSourceCreateThumbnailFromImageIfAbsent: hasJPEG,
+                kCGImageSourceCreateThumbnailFromImageAlways: hasDeveloped,
+                kCGImageSourceCreateThumbnailFromImageIfAbsent: hasDeveloped,
                 kCGImageSourceCreateThumbnailWithTransform: true,
                 kCGImageSourceThumbnailMaxPixelSize: 384,
                 kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
@@ -177,9 +246,13 @@ enum CaptureStore {
         return bytes
     }
 
-    // Two independent assets: Photos displays the finished film JPEG directly.
+    // Two independent assets: Photos displays the finished film image directly.
     // A RAW+alternatePhoto pair can otherwise default to the RAW's own preview.
     static func saveToPhotos(_ item: CaptureItem, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard item.hasDevelopedImage else {
+            completion(.failure(PocketFailure.message("未找到成片，请重新显影后保存。")))
+            return
+        }
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 completion(.failure(PocketFailure.message("没有相册写入权限；RAW 和成片仍保存在应用内，可分享导出。")))
@@ -189,7 +262,7 @@ enum CaptureStore {
                 let raw = PHAssetCreationRequest.forAsset()
                 raw.addResource(with: .photo, fileURL: item.source, options: nil)
                 let processed = PHAssetCreationRequest.forAsset()
-                processed.addResource(with: .photo, fileURL: item.jpeg, options: nil)
+                processed.addResource(with: .photo, fileURL: item.developed, options: nil)
             } completionHandler: { ok, error in
                 if ok { completion(.success(Void())) }
                 else { completion(.failure(error ?? PocketFailure.message("保存相册失败；本地文件已保留。"))) }

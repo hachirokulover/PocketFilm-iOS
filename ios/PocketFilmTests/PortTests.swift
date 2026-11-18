@@ -60,7 +60,7 @@ final class PortTests: XCTestCase {
         } }
         rgba.withUnsafeBytes { texture.replace(region: MTLRegionMake2D(0, 0, 16, 16), mipmapLevel: 0,
                                                withBytes: $0.baseAddress!, bytesPerRow: 16 * 8) }
-        let bytes = try engine.jpeg(FilmFrame(texture: texture, elapsedMS: 0, colorSpace: FilmEngine.outputSpace))
+        let bytes = try engine.encode(FilmFrame(texture: texture, elapsedMS: 0, colorSpace: FilmEngine.outputSpace), settings: .legacy)
         let jpeg = try XCTUnwrap(CIImage(data: bytes))
         var row = [UInt8](repeating: 0, count: 16 * 16 * 4)
         row.withUnsafeMutableBytes { engine.context.render(jpeg, toBitmap: $0.baseAddress!, rowBytes: 64,
@@ -147,6 +147,7 @@ final class PortTests: XCTestCase {
         let legacy = Data(#"{"film":"kodak_portra_400","sceneEV":0.5,"temperature":6300}"#.utf8)
         let old = try JSONDecoder().decode(FilmRecipe.self, from: legacy)
         XCTAssertFalse(old.border.enabled)
+        XCTAssertEqual(old.export, .legacy)
         XCTAssertEqual(old.sceneEV, 0.5)
         XCTAssertEqual(old.temperature, 6300)
         var recipe = old
@@ -174,7 +175,7 @@ final class PortTests: XCTestCase {
         var recipe = FilmRecipe()
         let item = try CaptureStore.prepare(raw: original, recipe: recipe, baseDirectory: scratch)
         XCTAssertFalse(CaptureStore.isCurrent(item, recipe: recipe))
-        try Data([0xFF, 0xD8, 0xFF, 0xD9]).write(to: item.jpeg)
+        try Data([0xFF, 0xD8, 0xFF, 0xD9]).write(to: item.developed)
         XCTAssertTrue(CaptureStore.isCurrent(item, recipe: recipe))
         recipe.border.enabled = true
         XCTAssertFalse(CaptureStore.isCurrent(item, recipe: recipe))

@@ -13,6 +13,7 @@ struct FilmRecipe: Codable, Equatable {
     var grainAmount: Double = 1
     var halationAmount: Double = 1
     var border = FilmBorderSettings()
+    var export = ExportSettings()
 
     // Full-frame spectral rendering is required for upstream overscan. Keep
     // its input bounded on phones; the film margin adds pixels outside it.
@@ -22,7 +23,7 @@ struct FilmRecipe: Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case film, paper, sceneEV, grain, halation, monochrome, maxPhotoEdge
-        case temperature, automaticWhiteBalance, grainAmount, halationAmount, border
+        case temperature, automaticWhiteBalance, grainAmount, halationAmount, border, export
     }
 
     init(from decoder: Decoder) throws {
@@ -40,6 +41,7 @@ struct FilmRecipe: Codable, Equatable {
         grainAmount = try c.decodeIfPresent(Double.self, forKey: .grainAmount) ?? d.grainAmount
         halationAmount = try c.decodeIfPresent(Double.self, forKey: .halationAmount) ?? d.halationAmount
         border = try c.decodeIfPresent(FilmBorderSettings.self, forKey: .border) ?? d.border
+        export = try c.decodeIfPresent(ExportSettings.self, forKey: .export) ?? .legacy
     }
 
     // Current SpektraLab's product_defaults disables print exposure compensation.
@@ -48,7 +50,8 @@ struct FilmRecipe: Codable, Equatable {
         ["product_defaults": true,
          "film_stock": film, "print_stock": paper,
          "input_color_space": "ProPhoto RGB", "input_cctf_decoding": false,
-         "output_color_space": "sRGB", "output_cctf_encoding": true,
+         "output_color_space": export.colorSpace.engineName,
+         "output_cctf_encoding": export.colorSpace.engineEncodesTransfer,
          "exposure_compensation_ev": sceneEV,
          "auto_exposure": true, "grain_active": preview ? false : (grain && grainAmount > 0),
          "grain_amount": grainAmount,

@@ -27,7 +27,9 @@ final class RenderWorker {
                 let result = Result<FilmFrame, Error> {
                     let saved = try CaptureStore.prepare(raw: raw, recipe: recipe, capturedAt: capturedAt)
                     item = saved
-                    return try self.develop(saved, recipe: recipe)
+                    let (updated, frame) = try self.develop(saved, recipe: recipe)
+                    item = updated
+                    return frame
                 }
                 let saved = item
                 DispatchQueue.main.async { completion(saved, result) }
@@ -40,7 +42,12 @@ final class RenderWorker {
         queue.async {
             autoreleasepool {
                 let result = Result { try self.develop(item, recipe: recipe) }
-                DispatchQueue.main.async { completion(item, result) }
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let (updated, frame)): completion(updated, .success(frame))
+                    case .failure(let error): completion(item, .failure(error))
+                    }
+                }
             }
         }
     }
@@ -56,7 +63,9 @@ final class RenderWorker {
                     let bytes = try Data(contentsOf: url)
                     let saved = try CaptureStore.prepare(raw: bytes, recipe: recipe, ext: url.pathExtension, capturedAt: importedAt)
                     item = saved
-                    return try self.develop(saved, recipe: recipe)
+                    let (updated, frame) = try self.develop(saved, recipe: recipe)
+                    item = updated
+                    return frame
                 }
                 let saved = item
                 DispatchQueue.main.async { completion(saved, result) }
@@ -64,21 +73,18 @@ final class RenderWorker {
         }
     }
 
-    private func develop(_ item: CaptureItem, recipe: FilmRecipe) throws -> FilmFrame {
+    private func develop(_ item: CaptureItem, recipe: FilmRecipe) throws -> (CaptureItem, FilmFrame) {
         try FilmEngine.validateRAW(item.source)
         let engine = try getEngine()
         let source = try engine.decodeRAW(item.source, maxEdge: recipe.processingEdge,
             temperature: recipe.automaticWhiteBalance ? nil : recipe.temperature)
         let result = try engine.render(source, recipe: recipe, preview: false)
-        let jpeg = try engine.jpeg(result)
-        // Write the new recipe only after a successful render. Existing files
-        // survive failed reprocessing; the original RAW is never overwritten.
-        try jpeg.write(to: item.jpeg, options: .atomic)
-        try CaptureStore.write(recipe: recipe, for: item)
+        let encoded = try engine.encode(result, settings: recipe.export)
+        let updated = try CaptureStore.writeDevelopedImage(encoded, recipe: recipe, for: item)
         // A missing thumbnail must not turn an otherwise saved photo into an
         // error. The library can retry its bounded ImageIO preview later.
-        try? CaptureStore.updateThumbnail(for: item)
-        return result
+        try? CaptureStore.updateThumbnail(for: updated)
+        return (updated, result)
     }
 
     func loadLibrary(completion: @escaping ([CaptureItem]) -> Void) {

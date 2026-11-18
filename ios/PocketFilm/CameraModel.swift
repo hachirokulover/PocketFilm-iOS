@@ -120,7 +120,7 @@ final class CameraModel {
     }
 
     // Save the recipe currently shown in the sheet, even if the user has not
-    // pressed the separate preview/redevelop button. Never export a stale JPEG
+    // pressed the separate preview/redevelop button. Never export a stale image
     // after a failed render. Keep controls locked until Photos consumes files.
     func saveToPhotos(_ item: CaptureItem, completion: @escaping (Result<Void, Error>) -> Void) {
         guard engineReady, !isProcessing else { return }
@@ -135,9 +135,15 @@ final class CameraModel {
                 guard let self else { return }
                 switch result {
                 case .success:
+                    guard let saved, CaptureStore.isCurrent(saved, recipe: snapshot) else {
+                        let error = PocketFailure.message("未找到应用当前设置的成片，请重新显影。")
+                        self.finish(saved ?? item, result: .failure(error))
+                        completion(.failure(error))
+                        return
+                    }
                     self.finish(saved, result: result)
                     self.beginProcessing("正在保存原片与当前成片…")
-                    self.writeToPhotos(item, completion: completion)
+                    self.writeToPhotos(saved, completion: completion)
                 case .failure(let error):
                     self.finish(saved, result: result)
                     completion(.failure(error))
@@ -192,7 +198,7 @@ final class CameraModel {
         if let saved = CaptureStore.readRecipe(for: item) { recipe = saved }
         selectedCapture = item
         imageRevision += 1
-        status = "已打开本地底片，可调整片边后重新显影或保存"
+        status = "已打开本地底片，可调整显影与导出设置"
         showingResult = true
     }
     func refreshLibrary() {

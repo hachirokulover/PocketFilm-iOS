@@ -41,7 +41,7 @@ final class CaptureLibraryTests: XCTestCase {
         XCTAssertTrue(second.folder.lastPathComponent.hasPrefix(first.folder.lastPathComponent + "_"))
         XCTAssertEqual(first.source.lastPathComponent, first.id + "_RAW.dng")
         XCTAssertEqual(second.source.lastPathComponent, second.id + "_RAW.arw")
-        XCTAssertEqual(first.jpeg.lastPathComponent, first.id + "_Film.jpg")
+        XCTAssertEqual(first.developed.lastPathComponent, first.id + "_Film.jpg")
         XCTAssertEqual(try Data(contentsOf: first.source), firstBytes)
         XCTAssertEqual(try Data(contentsOf: second.source), secondBytes)
         let listed = CaptureStore.recent(baseDirectory: library)
@@ -73,7 +73,7 @@ final class CaptureLibraryTests: XCTestCase {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         XCTAssertEqual(legacy.displayName, formatter.string(from: createdAt))
         XCTAssertEqual(legacy.source, raw)
-        XCTAssertEqual(legacy.jpeg, oldJPEG)
+        XCTAssertEqual(legacy.developed, oldJPEG)
         XCTAssertTrue(FileManager.default.fileExists(atPath: folder.path), "Listing must not rename existing folders")
         XCTAssertEqual(try Data(contentsOf: raw), Data("legacy original".utf8))
     }
@@ -82,14 +82,14 @@ final class CaptureLibraryTests: XCTestCase {
         let first = try CaptureStore.prepare(raw: Data("delete me".utf8), recipe: FilmRecipe(), baseDirectory: library)
         let keepBytes = Data("keep this original".utf8)
         let sibling = try CaptureStore.prepare(raw: keepBytes, recipe: FilmRecipe(), baseDirectory: library)
-        try Data([10, 20]).write(to: first.jpeg)
+        try Data([10, 20]).write(to: first.developed)
         try Data([30, 40]).write(to: first.thumbnailURL)
 
         try CaptureStore.delete([first], baseDirectory: library)
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: first.folder.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: first.source.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: first.jpeg.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.developed.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: first.recipeURL.path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: first.thumbnailURL.path))
         XCTAssertEqual(try Data(contentsOf: sibling.source), keepBytes)
@@ -102,13 +102,13 @@ final class CaptureLibraryTests: XCTestCase {
         let outside = try CaptureStore.prepare(raw: original, recipe: FilmRecipe(),
             baseDirectory: scratch.appendingPathComponent("Outside", isDirectory: true))
         let rootItem = CaptureItem(folder: library, source: library.appendingPathComponent("source.dng"),
-            jpeg: library.appendingPathComponent("film.jpg"))
+            developed: library.appendingPathComponent("film.jpg"))
         XCTAssertThrowsError(try CaptureStore.delete([rootItem], baseDirectory: library))
         XCTAssertThrowsError(try CaptureStore.delete([outside], baseDirectory: library))
         let link = library.appendingPathComponent("linked-capture", isDirectory: true)
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside.folder)
         let linkedItem = CaptureItem(folder: link, source: link.appendingPathComponent(outside.source.lastPathComponent),
-            jpeg: link.appendingPathComponent(outside.jpeg.lastPathComponent))
+            developed: link.appendingPathComponent(outside.developed.lastPathComponent))
         XCTAssertThrowsError(try CaptureStore.delete([linkedItem], baseDirectory: library))
         XCTAssertTrue(try link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true)
         XCTAssertEqual(try Data(contentsOf: outside.source), original)
@@ -143,7 +143,7 @@ final class CaptureLibraryTests: XCTestCase {
     func testThumbnailIsBoundedRefreshesAndCannotRecreateDeletedFolder() async throws {
         let original = Data("original RAW is never changed by thumbnail work".utf8)
         let item = try CaptureStore.prepare(raw: original, recipe: FilmRecipe(), baseDirectory: library)
-        try jpeg(width: 1500, height: 1000, red: 1, blue: 0).write(to: item.jpeg, options: .atomic)
+        try jpeg(width: 1500, height: 1000, red: 1, blue: 0).write(to: item.developed, options: .atomic)
         let firstBytes = await CaptureStore.thumbnailData(for: item)
         let firstData = try XCTUnwrap(firstBytes)
         let first = try image(firstData)
@@ -155,7 +155,7 @@ final class CaptureLibraryTests: XCTestCase {
 
         // Reprocessing writes a differently oriented/content JPEG. The same
         // cache URL must now contain this version, rather than the old image.
-        try jpeg(width: 600, height: 900, red: 0, blue: 1).write(to: item.jpeg, options: .atomic)
+        try jpeg(width: 600, height: 900, red: 0, blue: 1).write(to: item.developed, options: .atomic)
         try CaptureStore.updateThumbnail(for: item)
         let updatedBytes = await CaptureStore.thumbnailData(for: item)
         let updated = try image(XCTUnwrap(updatedBytes))
@@ -171,6 +171,50 @@ final class CaptureLibraryTests: XCTestCase {
         XCTAssertNil(staleRowResult)
         try CaptureStore.updateThumbnail(for: item)
         XCTAssertFalse(FileManager.default.fileExists(atPath: item.folder.path))
+    }
+
+    func testLibraryAndSharingFollowCommittedExportAcrossFormats() throws {
+        let raw = Data("original".utf8)
+        let firstJPEG = Data("first JPG".utf8)
+        let heif = Data("HEIF bytes".utf8)
+        var recipe = FilmRecipe()
+        let item = try CaptureStore.prepare(raw: raw, recipe: recipe, baseDirectory: library)
+        let jpegItem = try CaptureStore.writeDevelopedImage(firstJPEG, recipe: recipe, for: item)
+
+        recipe.export = ExportSettings(format: .heif, colorSpace: .displayP3, quality: 91)
+        XCTAssertFalse(CaptureStore.isCurrent(jpegItem, recipe: recipe))
+        let heifItem = try CaptureStore.writeDevelopedImage(heif, recipe: recipe, for: jpegItem)
+        let reopened = try XCTUnwrap(CaptureStore.recent(baseDirectory: library).first)
+        XCTAssertEqual(reopened.developed, heifItem.developed)
+        XCTAssertEqual(reopened.developed.pathExtension, "heic")
+        XCTAssertTrue(CaptureStore.isCurrent(reopened, recipe: recipe))
+        XCTAssertEqual(reopened.shareURLs, [reopened.source, reopened.developed, reopened.recipeURL])
+        XCTAssertEqual(try Data(contentsOf: reopened.developed), heif)
+        XCTAssertEqual(try Data(contentsOf: reopened.source), raw)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: jpegItem.developed.path))
+
+        recipe.export.quality = 100
+        let updated = try CaptureStore.writeDevelopedImage(Data("better HEIF".utf8), recipe: recipe, for: reopened)
+        XCTAssertNotEqual(updated.developed, heifItem.developed)
+        XCTAssertTrue(CaptureStore.isCurrent(updated, recipe: recipe))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: heifItem.developed.path))
+    }
+
+    func testFailedRecipeCommitPreservesPreviousExport() throws {
+        let bytes = Data("previous JPG".utf8)
+        var recipe = FilmRecipe()
+        let item = try CaptureStore.prepare(raw: Data([1]), recipe: recipe, baseDirectory: library)
+        let previous = try CaptureStore.writeDevelopedImage(bytes, recipe: recipe, for: item)
+        // JSONEncoder rejects non-finite numbers, exercising the failure after
+        // the image is staged but before its recipe becomes current.
+        recipe.export.quality = .nan
+        XCTAssertThrowsError(try CaptureStore.writeDevelopedImage(Data("uncommitted".utf8), recipe: recipe, for: previous))
+        XCTAssertEqual(try Data(contentsOf: previous.developed), bytes)
+        let reopened = try XCTUnwrap(CaptureStore.recent(baseDirectory: library).first)
+        XCTAssertEqual(reopened.developed, previous.developed)
+        XCTAssertTrue(CaptureStore.isCurrent(reopened, recipe: FilmRecipe()))
+        let jpegs = try FileManager.default.contentsOfDirectory(atPath: previous.folder.path).filter { $0.hasSuffix(".jpg") }
+        XCTAssertEqual(jpegs, [previous.developed.lastPathComponent])
     }
 
     private func calendar() -> Calendar {
