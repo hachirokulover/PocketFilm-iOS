@@ -2,6 +2,8 @@ import SwiftUI
 import Observation
 import UIKit
 import AVFoundation
+import PhotosUI
+import UniformTypeIdentifiers
 
 @Observable @MainActor
 final class CameraModel {
@@ -110,7 +112,33 @@ final class CameraModel {
         guard engineReady, !isProcessing else { return }
         beginProcessing("正在导入并显影 RAW…")
         recipe.border.frameSeed = Int.random(in: 1...Int(Int32.max))
-        worker.importRAW(url, recipe: recipe, completion: completion())
+        worker.importImage(url, requiresRAW: true, recipe: recipe, importedAt: Date(), completion: completion())
+    }
+
+    func importPhoto(_ selection: PhotosPickerItem) async {
+        guard engineReady, !isProcessing else { return }
+        beginProcessing("正在从相册读取原片…")
+        recipe.border.frameSeed = Int.random(in: 1...Int(Int32.max))
+        let snapshot = recipe
+        let importedAt = Date()
+        let requiresRAW = selection.supportedContentTypes.contains { $0.conforms(to: .rawImage) }
+        do {
+            guard let photo = try await selection.loadTransferable(type: PickedPhoto.self) else {
+                let message = requiresRAW
+                    ? "相册未提供 RAW 文件。可把 RAW 原片存到“文件”后重试。"
+                    : "相册未提供此照片的图像文件。"
+                throw PocketFailure.message(message)
+            }
+            status = "正在导入并显影照片…"
+            let finishImport = completion()
+            worker.importImage(photo.url, requiresRAW: requiresRAW, recipe: snapshot, importedAt: importedAt) { item, result in
+                withExtendedLifetime(photo) { finishImport(item, result) }
+            }
+        } catch {
+            isProcessing = false
+            status = "相册导入未完成"
+            errorMessage = error.localizedDescription
+        }
     }
 
     func reprocess(_ item: CaptureItem) {
@@ -157,7 +185,7 @@ final class CameraModel {
             Task { @MainActor in
                 self?.isProcessing = false
                 switch result {
-                case .success: self?.status = "原始 RAW 与当前胶片成片已保存到相册"
+                case .success: self?.status = item.isRAW ? "原始 RAW 与胶片成片已保存到相册" : "胶片成片已保存到相册"
                 case .failure: self?.status = "保存相册未完成，本地文件已保留"
                 }
                 completion(result)
@@ -187,7 +215,7 @@ final class CameraModel {
                             frame.texture.width, frame.texture.height, frame.elapsedMS)
             showingResult = true
         case .failure(let error):
-            status = item == nil ? "拍摄未完成" : "原片已保留，可以重新显影"
+            status = item == nil ? "未能完成原片处理" : "原片已保留，可以重新显影"
             errorMessage = error.localizedDescription
             // Make a preserved RAW accessible even when its first decode fails.
             if item != nil { showingResult = true }

@@ -1,6 +1,7 @@
 import XCTest
 import Foundation
 import CoreGraphics
+import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
 @testable import PocketFilm
@@ -217,13 +218,32 @@ final class CaptureLibraryTests: XCTestCase {
         XCTAssertEqual(jpegs, [previous.developed.lastPathComponent])
     }
 
+    func testImportedPhotoKeepsBytesAndDecodesWithItsOrientation() throws {
+        let original = scratch.appendingPathComponent("selected-image")
+        let bytes = try jpeg(width: 120, height: 80, red: 1, blue: 0, orientation: .right)
+        try bytes.write(to: original)
+        let type = try XCTUnwrap(FilmEngine.imageType(original))
+        XCTAssertEqual(type, .jpeg)
+
+        let item = try CaptureStore.copyImportedImage(original, type: type, recipe: FilmRecipe(),
+            importedAt: Date(), baseDirectory: library)
+        let reopened = try XCTUnwrap(CaptureStore.recent(baseDirectory: library).first)
+        XCTAssertFalse(reopened.isRAW)
+        XCTAssertEqual(reopened.source, item.source)
+        XCTAssertEqual(try Data(contentsOf: reopened.source), bytes)
+        XCTAssertThrowsError(try FilmEngine.validateRAW(reopened.source))
+        let image = try FilmEngine.decodePhoto(reopened.source, maxEdge: 60, temperature: nil)
+        XCTAssertEqual(image.extent.size, CGSize(width: 40, height: 60))
+    }
+
     private func calendar() -> Calendar {
         var value = Calendar(identifier: .gregorian)
         value.timeZone = .current
         return value
     }
 
-    private func jpeg(width: Int, height: Int, red: CGFloat, blue: CGFloat) throws -> Data {
+    private func jpeg(width: Int, height: Int, red: CGFloat, blue: CGFloat,
+                      orientation: CGImagePropertyOrientation = .up) throws -> Data {
         let context = try XCTUnwrap(CGContext(data: nil, width: width, height: height,
             bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
@@ -232,7 +252,10 @@ final class CaptureLibraryTests: XCTestCase {
         let bitmap = try XCTUnwrap(context.makeImage())
         let bytes = NSMutableData()
         let destination = try XCTUnwrap(CGImageDestinationCreateWithData(bytes, UTType.jpeg.identifier as CFString, 1, nil))
-        CGImageDestinationAddImage(destination, bitmap, [kCGImageDestinationLossyCompressionQuality: 1.0] as CFDictionary)
+        CGImageDestinationAddImage(destination, bitmap, [
+            kCGImageDestinationLossyCompressionQuality: 1.0,
+            kCGImagePropertyOrientation: orientation.rawValue,
+        ] as CFDictionary)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         return bytes as Data
     }

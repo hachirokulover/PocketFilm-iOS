@@ -17,6 +17,7 @@ struct CaptureItem: Identifiable {
         self.displayName = displayName ?? CaptureStore.dateName(capturedAt)
     }
     var id: String { folder.lastPathComponent }
+    var isRAW: Bool { source.deletingPathExtension().lastPathComponent != id + "_Photo" }
     var recipeURL: URL { folder.appendingPathComponent("recipe.json") }
     var thumbnailURL: URL { folder.appendingPathComponent("thumbnail.jpg") }
     var shareURLs: [URL] {
@@ -78,12 +79,34 @@ enum CaptureStore {
 
     static func prepare(raw: Data, recipe: FilmRecipe, ext: String = "dng", baseDirectory: URL? = nil,
                         capturedAt: Date = Date()) throws -> CaptureItem {
+        try prepare(recipe: recipe, ext: ext, isRAW: true, baseDirectory: baseDirectory, capturedAt: capturedAt) {
+            try raw.write(to: $0, options: .atomic)
+        }
+    }
+
+    static func copyImportedImage(_ url: URL, type: UTType, recipe: FilmRecipe, importedAt: Date,
+                                  baseDirectory: URL? = nil) throws -> CaptureItem {
+        guard let ext = type.preferredFilenameExtension, type.conforms(to: .image) else {
+            throw PocketFailure.message("无法识别导入照片的文件格式。")
+        }
+        return try prepare(recipe: recipe, ext: ext, isRAW: type.conforms(to: .rawImage),
+            baseDirectory: baseDirectory, capturedAt: importedAt) { target in
+            try FileManager.default.copyItem(at: url, to: target)
+        }
+    }
+
+    private static func prepare(recipe: FilmRecipe, ext: String, isRAW: Bool, baseDirectory: URL?,
+                                capturedAt: Date, writeOriginal: (URL) throws -> Void) throws -> CaptureItem {
         let folder = try allocateFolder(in: baseDirectory ?? root, date: capturedAt)
         let stem = folder.lastPathComponent
-        let source = folder.appendingPathComponent(stem + "_RAW").appendingPathExtension(ext)
-        // Original first: decoding, rendering, Photos permission, and export
-        // can all fail without losing the camera's DNG.
-        try raw.write(to: source, options: .atomic)
+        let suffix = isRAW ? "_RAW" : "_Photo"
+        let source = folder.appendingPathComponent(stem + suffix).appendingPathExtension(ext)
+        do {
+            try writeOriginal(source)
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            throw error
+        }
         let item = CaptureItem(folder: folder, source: source,
             developed: folder.appendingPathComponent(stem + "_Film").appendingPathExtension(recipe.export.format.fileExtension),
             capturedAt: capturedAt)
@@ -167,7 +190,8 @@ enum CaptureStore {
                 includingPropertiesForKeys: nil),
                   let source = files.first(where: {
                       let name = $0.deletingPathExtension().lastPathComponent
-                      return name == "source" || name == folder.lastPathComponent + "_RAW"
+                      return name == "source" || name == folder.lastPathComponent + "_RAW" ||
+                          name == folder.lastPathComponent + "_Photo"
                   })
             else { return nil }
             let info = (try? Data(contentsOf: folder.appendingPathComponent("capture.json")))
@@ -226,14 +250,15 @@ enum CaptureStore {
         guard fm.fileExists(atPath: item.folder.path) else { return nil }
         let hasDeveloped = item.hasDevelopedImage
         let input = hasDeveloped ? item.developed : item.source
+        let canDownsample = hasDeveloped || !item.isRAW
         let sourceDate = (try? input.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
         let cachedDate = (try? item.thumbnailURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
         if !force, cachedDate >= sourceDate, let bytes = try? Data(contentsOf: item.thumbnailURL) { return bytes }
         if fm.fileExists(atPath: item.thumbnailURL.path) { try fm.removeItem(at: item.thumbnailURL) }
         guard let source = CGImageSourceCreateWithURL(input as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                kCGImageSourceCreateThumbnailFromImageAlways: hasDeveloped,
-                kCGImageSourceCreateThumbnailFromImageIfAbsent: hasDeveloped,
+                kCGImageSourceCreateThumbnailFromImageAlways: canDownsample,
+                kCGImageSourceCreateThumbnailFromImageIfAbsent: canDownsample,
                 kCGImageSourceCreateThumbnailWithTransform: true,
                 kCGImageSourceThumbnailMaxPixelSize: 384,
                 kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
@@ -246,8 +271,8 @@ enum CaptureStore {
         return bytes
     }
 
-    // Two independent assets: Photos displays the finished film image directly.
-    // A RAW+alternatePhoto pair can otherwise default to the RAW's own preview.
+    // Save camera RAW and the film image as independent assets. Processed
+    // photo inputs already live in Photos, so only save their film image.
     static func saveToPhotos(_ item: CaptureItem, completion: @escaping (Result<Void, Error>) -> Void) {
         guard item.hasDevelopedImage else {
             completion(.failure(PocketFailure.message("未找到成片，请重新显影后保存。")))
@@ -259,8 +284,10 @@ enum CaptureStore {
                 return
             }
             PHPhotoLibrary.shared().performChanges {
-                let raw = PHAssetCreationRequest.forAsset()
-                raw.addResource(with: .photo, fileURL: item.source, options: nil)
+                if item.isRAW {
+                    let raw = PHAssetCreationRequest.forAsset()
+                    raw.addResource(with: .photo, fileURL: item.source, options: nil)
+                }
                 let processed = PHAssetCreationRequest.forAsset()
                 processed.addResource(with: .photo, fileURL: item.developed, options: nil)
             } completionHandler: { ok, error in

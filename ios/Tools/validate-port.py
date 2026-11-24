@@ -16,10 +16,10 @@ def validate():
     schema_text = (REPO / "engine/src/core/params.cpp").read_text(encoding="utf-8")
     schema = {m[0]: (m[1], float(m[2]), float(m[3])) for m in re.findall(
         r'\{"([a-z0-9_]+)"\s*,\s*"[^"]+"\s*,\s*[SBIF],\s*(?:SHOOT|PRINT),\s*(true|false),\s*([\d.eE+-]+),\s*([\d.eE+-]+)', schema_text)}
-    recipe = (ROOT / "PocketFilm/FilmRecipe.swift").read_text(encoding="utf-8")
+    recipe = (ROOT / "RustCore/src/lib.rs").read_text(encoding="utf-8")
     # These are the *actual wire keys* sent by the phone. Compare against the
     # upstream schema, rather than maintaining a second list of accepted keys.
-    delta = recipe.split("func engineDelta", 1)[1].split("\n    }", 1)[0]
+    delta = recipe.split("fn engine_delta", 1)[1].split("\n}", 1)[0]
     for key, value in re.findall(r'"([a-z0-9_]+)"\s*:\s*([^,\n\]]+)', delta):
         if key == "product_defaults":
             continue

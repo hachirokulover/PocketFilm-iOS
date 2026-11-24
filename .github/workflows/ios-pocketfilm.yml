@@ -47,6 +47,12 @@ jobs:
         run: |
           xcrun -sdk iphoneos metal --version || xcodebuild -downloadComponent MetalToolchain
 
+      - name: Prepare Rust for iOS
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add --toolchain stable aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+          cargo +stable test --locked --manifest-path ios/RustCore/Cargo.toml --target-dir ios/build/rust-host
+
       - name: Compile iPhone app and package unsigned IPA
         run: bash ios/Tools/cloud-build.sh
 

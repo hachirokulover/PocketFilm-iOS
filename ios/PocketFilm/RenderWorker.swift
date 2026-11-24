@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreImage
+import UniformTypeIdentifiers
 
 final class RenderWorker {
     private let queue = DispatchQueue(label: "org.pocketfilm.render", qos: .userInitiated)
@@ -52,7 +53,7 @@ final class RenderWorker {
         }
     }
 
-    func importRAW(_ url: URL, recipe: FilmRecipe, importedAt: Date = Date(),
+    func importImage(_ url: URL, requiresRAW: Bool, recipe: FilmRecipe, importedAt: Date,
                    completion: @escaping (CaptureItem?, Result<FilmFrame, Error>) -> Void) {
         queue.async {
             autoreleasepool {
@@ -60,8 +61,13 @@ final class RenderWorker {
                 let result = Result<FilmFrame, Error> {
                     let access = url.startAccessingSecurityScopedResource()
                     defer { if access { url.stopAccessingSecurityScopedResource() } }
-                    let bytes = try Data(contentsOf: url)
-                    let saved = try CaptureStore.prepare(raw: bytes, recipe: recipe, ext: url.pathExtension, capturedAt: importedAt)
+                    guard let type = FilmEngine.imageType(url) else {
+                        throw PocketFailure.message("系统无法识别这份图像文件。")
+                    }
+                    guard !requiresRAW || type.conforms(to: .rawImage) else {
+                        throw PocketFailure.message("未收到 RAW 原片。请将原始 RAW 保存到“文件”，再从 PocketFilm 导入。")
+                    }
+                    let saved = try CaptureStore.copyImportedImage(url, type: type, recipe: recipe, importedAt: importedAt)
                     item = saved
                     let (updated, frame) = try self.develop(saved, recipe: recipe)
                     item = updated
@@ -74,10 +80,11 @@ final class RenderWorker {
     }
 
     private func develop(_ item: CaptureItem, recipe: FilmRecipe) throws -> (CaptureItem, FilmFrame) {
-        try FilmEngine.validateRAW(item.source)
         let engine = try getEngine()
-        let source = try engine.decodeRAW(item.source, maxEdge: recipe.processingEdge,
-            temperature: recipe.automaticWhiteBalance ? nil : recipe.temperature)
+        let temperature = recipe.automaticWhiteBalance ? nil : recipe.temperature
+        let source = item.isRAW
+            ? try engine.decodeRAW(item.source, maxEdge: recipe.processingEdge, temperature: temperature)
+            : try FilmEngine.decodePhoto(item.source, maxEdge: recipe.processingEdge, temperature: temperature)
         let result = try engine.render(source, recipe: recipe, preview: false)
         let encoded = try engine.encode(result, settings: recipe.export)
         let updated = try CaptureStore.writeDevelopedImage(encoded, recipe: recipe, for: item)

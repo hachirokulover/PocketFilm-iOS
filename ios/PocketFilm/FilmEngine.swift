@@ -77,13 +77,39 @@ final class FilmEngine {
         })
     }
 
-    static func validateRAW(_ url: URL) throws {
+    static func imageType(_ url: URL) -> UTType? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               CGImageSourceGetCount(source) > 0,
               let identifier = CGImageSourceGetType(source),
-              let type = UTType(identifier as String), type.conforms(to: .rawImage) else {
+              let type = UTType(identifier as String), type.conforms(to: .image) else { return nil }
+        return type
+    }
+
+    static func validateRAW(_ url: URL) throws {
+        guard imageType(url)?.conforms(to: .rawImage) == true else {
             throw PocketFailure.message("文件不是系统可识别的 RAW，或文件已损坏。原始文件已保留。")
         }
+    }
+
+    static func decodePhoto(_ url: URL, maxEdge: Int, temperature: Double?) throws -> CIImage {
+        guard maxEdge > 0,
+              let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let bitmap = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxEdge,
+              ] as CFDictionary) else {
+            throw PocketFailure.message("系统无法解码这张照片。原始文件已保留。")
+        }
+        // Preserve embedded color profiles and use sRGB for untagged photos.
+        let options: [CIImageOption: Any] = [.colorSpace: bitmap.colorSpace ?? outputSpace]
+        let image = CIImage(cgImage: bitmap, options: options)
+        guard let temperature else { return image }
+        let filter = CIFilter.temperatureAndTint()
+        filter.inputImage = image
+        filter.neutral = CIVector(x: CGFloat(temperature), y: 0)
+        filter.targetNeutral = CIVector(x: 6500, y: 0)
+        return filter.outputImage ?? image
     }
 
     func decodeRAW(_ url: URL, maxEdge: Int, temperature: Double? = nil) throws -> CIImage {
@@ -117,11 +143,10 @@ final class FilmEngine {
     static func resized(_ image: CIImage, maxEdge: Int) -> CIImage {
         let extent = image.extent
         guard maxEdge > 0, !extent.isEmpty, !extent.isInfinite else { return image }
-        let scale = min(1, CGFloat(maxEdge) / max(extent.width, extent.height))
         // Compute the target before applying floating-point transforms. The
         // transformed extent can be 480.0000000001; integral then adds a pixel.
-        let width = max(1, Int((extent.width * scale).rounded()))
-        let height = max(1, Int((extent.height * scale).rounded()))
+        let size = pf_resized_size(Double(extent.width), Double(extent.height), Int64(maxEdge))
+        let width = CGFloat(size.width), height = CGFloat(size.height)
         let origin = image.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
         let scaled = origin.transformed(by: CGAffineTransform(
             scaleX: CGFloat(width) / extent.width, y: CGFloat(height) / extent.height))
@@ -151,39 +176,27 @@ final class FilmEngine {
 
     func render(_ source: CIImage, recipe: FilmRecipe, preview: Bool) throws -> FilmFrame {
         let start = CFAbsoluteTimeGetCurrent()
-        let maxEdge = preview ? 480 : recipe.processingEdge
+        let maxEdge = Int(pf_processing_edge(Int64(recipe.maxPhotoEdge), recipe.border.enabled, preview))
         let image = Self.resized(recipe.border.cropped(source), maxEdge: maxEdge)
-        let data = try JSONSerialization.data(withJSONObject: recipe.engineDelta(preview: preview),
-                                               options: [.sortedKeys])
-        let delta = String(decoding: data, as: UTF8.self)
-        var reply: UnsafeMutablePointer<CChar>?
-        let session: OpaquePointer? = try autoreleasepool {
+        let data = try JSONEncoder().encode(recipe)
+        var error: UnsafeMutablePointer<CChar>?
+        defer { pf_free_string(error) }
+        let opaque = try autoreleasepool {
             let (buffer, width, height) = try inputBuffer(image)
-            var frame = spk_device_image(buffer: Unmanaged.passUnretained(buffer as AnyObject).toOpaque(),
-                                         width: UInt32(width), height: UInt32(height), channels: 4)
             return withExtendedLifetime(buffer) {
-                delta.withCString { spk_open_device(handle, &frame, $0, &reply) }
+                data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+                    recipe.border.edgeText(stock: recipe.film).withCString { text in
+                        pf_render_texture(handle, Unmanaged.passUnretained(buffer as AnyObject).toOpaque(),
+                            UInt32(width), UInt32(height), bytes.bindMemory(to: UInt8.self).baseAddress,
+                            bytes.count, preview, text, &error)
+                    }
+                }
             }
         }
-        defer { spk_string_free(reply) }
-        guard let session else { throw failure() }
-        defer { spk_session_release(session) }
-        // The output colour is an explicit contract, still checked in the
-        // resolved reply so an upstream convention change cannot recolour it.
-        guard let reply, let replyData = String(cString: reply).data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: replyData) as? [String: Any],
-              let params = json["params"] as? [String: Any],
-              params["output_color_space"] as? String == recipe.export.colorSpace.engineName,
-              params["output_cctf_encoding"] as? Bool == recipe.export.colorSpace.engineEncodesTransfer else {
-            throw PocketFailure.message("引擎输出颜色空间与应用约定不同。")
+        guard let opaque else {
+            let message = error.map { String(cString: $0) } ?? "胶片引擎无法完成显影。"
+            throw PocketFailure.message(message)
         }
-        var result = spk_result()
-        try check(spk_render(session, "full", &result))
-        guard let opaque = result.texture else {
-            spk_result_free(&result)
-            throw PocketFailure.message("引擎没有返回纹理。")
-        }
-        // +1 belongs to us. ARC now owns it; spk_result_free would double-free.
         let texture = Unmanaged<AnyObject>.fromOpaque(opaque).takeRetainedValue() as! MTLTexture
         return FilmFrame(texture: texture, elapsedMS: (CFAbsoluteTimeGetCurrent() - start) * 1000,
                          colorSpace: recipe.export.colorSpace.engineColorSpace)

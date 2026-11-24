@@ -17,7 +17,7 @@ struct FilmRecipe: Codable, Equatable {
 
     // Full-frame spectral rendering is required for upstream overscan. Keep
     // its input bounded on phones; the film margin adds pixels outside it.
-    var processingEdge: Int { border.enabled ? min(maxPhotoEdge, 2048) : maxPhotoEdge }
+    var processingEdge: Int { Int(pf_processing_edge(Int64(maxPhotoEdge), border.enabled, false)) }
 
     init() {}
 
@@ -44,32 +44,19 @@ struct FilmRecipe: Codable, Equatable {
         export = try c.decodeIfPresent(ExportSettings.self, forKey: .export) ?? .legacy
     }
 
-    // Current SpektraLab's product_defaults disables print exposure compensation.
-    // Apply film EV after its meter so auto exposure cannot cancel this control.
-    func engineDelta(preview: Bool) -> [String: Any] {
-        ["product_defaults": true,
-         "film_stock": film, "print_stock": paper,
-         "input_color_space": "ProPhoto RGB", "input_cctf_decoding": false,
-         "output_color_space": export.colorSpace.engineName,
-         "output_cctf_encoding": export.colorSpace.engineEncodesTransfer,
-         "exposure_compensation_ev": sceneEV,
-         "auto_exposure": true, "grain_active": preview ? false : (grain && grainAmount > 0),
-         "grain_amount": grainAmount,
-         "grain_sublayers_active": !monochrome,
-         "halation_active": halation && halationAmount > 0,
-         "halation_amount": halationAmount, "glare_active": false,
-         "extended_dynamic_range": false, "striped": !border.enabled,
-         "overscan_active": border.enabled,
-         "overscan_format": border.format.rawValue, "overscan_mode": border.scan.rawValue,
-         "overscan_holes": border.holes.rawValue, "overscan_gate": "auto",
-         "overscan_fog": border.fog, "overscan_leaks": border.leaks,
-         "overscan_camera_seed": border.cameraSeed, "overscan_frame_seed": border.frameSeed,
-         "overscan_frame_number": border.frameNumber,
-         "overscan_edge_text": border.edgeText(stock: film), "overscan_pair": false,
-         "overscan_carrier": "none",
-         // The render uses the full tier of a pre-scaled source. 800 is the
-         // wire's minimum live-tier setting, not the preview's input size.
-         "strip_rows": 128, "preview_long_edge": 800]
+    func engineDelta(preview: Bool) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(self)
+        let delta = data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+            border.edgeText(stock: film).withCString { text in
+                pf_engine_delta(bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count, preview, text)
+            }
+        }
+        defer { pf_free_string(delta) }
+        guard let delta,
+              let value = try JSONSerialization.jsonObject(with: Data(String(cString: delta).utf8)) as? [String: Any] else {
+            throw PocketFailure.message("无法读取显影设置。")
+        }
+        return value
     }
 }
 

@@ -99,11 +99,11 @@ final class PortTests: XCTestCase {
         }
     }
 
-    func testManualEffectValuesReachTheEngine() {
+    func testManualEffectValuesReachTheEngine() throws {
         var recipe = FilmRecipe()
         recipe.grainAmount = 0
         recipe.halationAmount = 2.5
-        let delta = recipe.engineDelta(preview: false)
+        let delta = try recipe.engineDelta(preview: false)
         XCTAssertEqual(delta["grain_active"] as? Bool, false)
         XCTAssertEqual(delta["grain_amount"] as? Double, 0)
         XCTAssertEqual(delta["halation_amount"] as? Double, 2.5)
@@ -157,14 +157,14 @@ final class PortTests: XCTestCase {
         recipe.border.holes = .black
         let roundTrip = try JSONDecoder().decode(FilmRecipe.self, from: JSONEncoder().encode(recipe))
         XCTAssertEqual(roundTrip, recipe)
-        let delta = recipe.engineDelta(preview: false)
+        let delta = try recipe.engineDelta(preview: false)
         XCTAssertEqual(delta["overscan_active"] as? Bool, true)
         XCTAssertEqual(delta["overscan_format"] as? String, "120_6x7")
         XCTAssertEqual(delta["striped"] as? Bool, false)
         XCTAssertEqual(recipe.processingEdge, 2048)
         recipe.border.enabled = false
-        XCTAssertEqual(recipe.engineDelta(preview: false)["overscan_active"] as? Bool, false)
-        XCTAssertEqual(recipe.engineDelta(preview: false)["striped"] as? Bool, true)
+        XCTAssertEqual(try recipe.engineDelta(preview: false)["overscan_active"] as? Bool, false)
+        XCTAssertEqual(try recipe.engineDelta(preview: false)["striped"] as? Bool, true)
         XCTAssertEqual(recipe.processingEdge, 4032)
     }
 

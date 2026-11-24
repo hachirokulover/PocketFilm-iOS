@@ -59,7 +59,8 @@ def generate():
         (test_builds if path in tests else app_builds).append(build)
 
     frameworks = ["Metal", "MetalKit", "Foundation", "QuartzCore", "CoreImage", "CoreGraphics",
-                  "CoreText", "Accelerate", "AVFoundation", "Photos", "UIKit", "ImageIO", "UniformTypeIdentifiers"]
+                  "CoreText", "Accelerate", "AVFoundation", "Photos", "PhotosUI", "CoreTransferable",
+                  "UIKit", "ImageIO", "UniformTypeIdentifiers"]
     framework_ids, framework_builds = [], []
     for name in frameworks:
         ref = obj("framework:" + name,
@@ -93,6 +94,11 @@ def generate():
                  "files = (); inputPaths = (); outputPaths = (); name = \"Compile iOS engine kernels and bundle licenses\"; "
                  "runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/bash; "
                  f"shellScript = {quote(script_command)};")
+    rust_command = '/bin/bash "$SRCROOT/Tools/build-rust-core.sh"'
+    rust_output = quote("$(DERIVED_FILE_DIR)/libpocketfilm_core.a")
+    rust_script = obj("build-rust", f"isa = PBXShellScriptBuildPhase; alwaysOutOfDate = 1; buildActionMask = 2147483647; "
+                      f"files = (); inputPaths = (); outputPaths = ({rust_output},); name = \"Build Rust film core\"; "
+                      f"runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/bash; shellScript = {quote(rust_command)};")
     common = {
         "IPHONEOS_DEPLOYMENT_TARGET": "17.0", "SDKROOT": "iphoneos", "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator",
         "TARGETED_DEVICE_FAMILY": "1", "SUPPORTS_MACCATALYST": "NO", "SWIFT_VERSION": "5.0",
@@ -117,6 +123,7 @@ def generate():
             "INFOPLIST_FILE": "PocketFilm/Info.plist", "GENERATE_INFOPLIST_FILE": "NO",
             "SWIFT_OPTIMIZATION_LEVEL": "-Onone" if debug else "-O", "ENABLE_TESTABILITY": "YES" if debug else "NO",
             "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG" if debug else "",
+            "OTHER_LDFLAGS": '$(inherited) "$(DERIVED_FILE_DIR)/libpocketfilm_core.a" -lresolv -framework Security',
             "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
         })))
         test_configs.append(config("test-config:" + mode, mode, dict(common, **{
@@ -135,7 +142,7 @@ def generate():
                 f"remoteGlobalIDString = {app_target}; remoteInfo = PocketFilm;")
     dependency = obj("test-dependency", f"isa = PBXTargetDependency; target = {app_target}; targetProxy = {proxy};")
     obj("app-target", f"isa = PBXNativeTarget; buildConfigurationList = {app_cl}; "
-        f"buildPhases = {array([script, app_source_phase, app_fw, assets_phase])}; buildRules = (); dependencies = (); "
+        f"buildPhases = {array([rust_script, script, app_source_phase, app_fw, assets_phase])}; buildRules = (); dependencies = (); "
         f"name = PocketFilm; productName = PocketFilm; productReference = {product}; productType = \"com.apple.product-type.application\";")
     test_target = obj("test-target", f"isa = PBXNativeTarget; buildConfigurationList = {test_cl}; "
                       f"buildPhases = {array([test_source_phase, test_fw])}; buildRules = (); dependencies = {array([dependency])}; "

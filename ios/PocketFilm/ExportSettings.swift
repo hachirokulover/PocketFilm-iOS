@@ -36,8 +36,6 @@ enum ExportColorSpace: String, CaseIterable, Codable {
     // The engine supports Adobe RGB and Display P3 directly. DCI-P3 needs
     // different white point and transfer curves, so convert from a wide
     // linear engine output through Core Image's DCI-P3 profile.
-    var engineName: String { self == .dciP3 ? "ProPhoto RGB" : title }
-    var engineEncodesTransfer: Bool { self != .dciP3 }
     var engineColorSpace: CGColorSpace { self == .dciP3 ? FilmEngine.linearProPhoto : colorSpace }
 }
 
@@ -50,6 +48,6 @@ struct ExportSettings: Codable, Equatable {
     static let legacy = ExportSettings(quality: 95)
 
     var compressionQuality: Double {
-        min(Self.qualityRange.upperBound, max(Self.qualityRange.lowerBound, quality)) / 100
+        pf_compression_quality(quality)
     }
 }
