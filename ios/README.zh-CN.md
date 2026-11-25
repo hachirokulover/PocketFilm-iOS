@@ -16,8 +16,9 @@
 - 相机页右上角「导入照片」可从系统相册选择普通照片或 RAW，每次处理一张。普通照片沿用现有白平衡，可手动调整色温。相册提供的 RAW 原片走 RAW 解码；未能提供 RAW 时，可从「文件」导入原始 RAW。
 - 相册导入只读取选中的图片。普通照片的输入文件保存在本地底片库，保存回系统相册时只新增显影成片。
 - 拍摄页和成片页的“成片导出”可选择 JPG / HEIF、sRGB / Adobe RGB (1998) / Display P3 / DCI-P3，以及 1–100 的压缩质量。新设置默认 JPG、sRGB、质量 100。打开旧底片会读取该张成片的导出设置，旧版参数对应 JPG、sRGB、质量 95。
-- 色温 2000–12000 K、颗粒 0–2、光晕 0–4 滑条，应用到下一张 RAW 或成片重新显影。
-- 可选 10 种胶片片边画幅、片条 / 扩孔片夹扫描、黑白齿孔、帧号、灰雾和漏光。拍前或拍后选择，保存自动应用当前设置。
+- 「胶片」菜单保留 20 种 Spektrafilm 预设，并加入 47 种 Fotufilm 调色配方。拍摄或导入前可从顶部参数栏选择，拍后可在「胶片成片」页更换配方并重新显影。 [Fotufilm 移植说明](Fotufilm/README.md)
+- 色温 2000–12000 K，应用到下一张照片或成片重新显影。Spektrafilm 预设还支持颗粒 0–2 和光晕 0–4。
+- Spektrafilm 预设可选 10 种胶片片边画幅、片条 / 扩孔片夹扫描、黑白齿孔、帧号、灰雾和漏光。拍前或拍后选择，保存自动应用当前设置。
 - 无片边画面长边上限 2048 / 4032px；开启片边时按胶片画幅居中裁剪，画面长边最多 2048px，再添加外侧片边。原始 RAW 保持完整尺寸。
 - 使用用户提供的图标，版本 0.3.0 / build 3。
 
@@ -27,7 +28,7 @@
 
 ## 构建
 
-显影参数转换、缩放规则、压缩质量和显影会话由 Rust 核心负责。SwiftUI 提供界面，Swift 调用 AVFoundation、Core Image 和 Photos，原有 C++／Metal 光谱引擎负责渲染。
+SwiftUI 提供界面，Swift 调用 AVFoundation、Core Image 和 Photos。Rust 转换 Spektrafilm 参数并调度原有 C++／Metal 光谱引擎，也计算缩放尺寸和压缩质量。Fotufilm 的颜色与反差由单独的 Metal 调色路径生成。调色表随仓库和应用打包，日常构建直接使用这些文件。
 
 本机 Xcode 构建需要通过 rustup 安装最新的 Rust 稳定版。
 
@@ -48,7 +49,7 @@ GitHub Actions 会准备 Rust 目标并运行本机测试。Xcode 按当前平�
 python3 ios/Tools/gen-project.py --check
 python3 ios/Tools/validate-port.py
 bash ios/Tools/verify-on-mac.sh
-# 在 Mac 上选择存在的模拟器运行 13 项测试：
+# 在 Mac 上选择已安装的模拟器运行测试
 bash ios/Tools/verify-on-mac.sh 'platform=iOS Simulator,id=你的模拟器UDID'
 ```
 
@@ -63,5 +64,7 @@ https://github.com/JamesQiu2005/SpektraLab
 
 光谱胶片模型与上游资料：Andrea Volpato / spektrafilm。
 https://github.com/andreavolpato/spektrafilm
+
+Fotufilm 调色表由 Fotufilm（© 2026 MUAStudio Inc.）的配方转换，按 CC BY-SA 4.0 分发。 [来源、许可与转换细节](Fotufilm/README.md)
 
 代码沿用 GPL-3.0-or-later；数据与 LUT 保留原始 CC BY-SA 4.0 署名。完整文本见 license/ 和 engine/resources_product/NOTICE.md。未修改胶片测量数据与 Metal 核心数学。新增 iOS 模拟器纹理输出路径，不改变真机输出算法。

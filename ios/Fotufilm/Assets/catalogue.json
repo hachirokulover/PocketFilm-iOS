@@ -1,0 +1,288 @@
+{
+  "revision": "6426fb2e46a35bd1e553",
+  "dimension": 33,
+  "stocks": [
+    {
+      "id": "acros100",
+      "name": "Acros 100 II",
+      "sourceSHA256": "2367dd45994922db169891b95e552fc2b56b2058f3ea03b0aaf43e08a46c56a5",
+      "lutSHA256": "985b9b82dd79c2d2c948e5e4b6315b38099eb93cae8eaa66395277215cac3f6f"
+    },
+    {
+      "id": "aerochrome1443",
+      "name": "Kodak Aerochrome 1443",
+      "sourceSHA256": "ef6e5f773fd6250fee28a25231c1dc22686bd535cbb3ec9a3b6e9798506af02e",
+      "lutSHA256": "e60c8d7616d6b5a0953a6319135eae00d6df3702cceaa017c782a013005e467f"
+    },
+    {
+      "id": "aerocolor2460",
+      "name": "Aerocolor IV 2460",
+      "sourceSHA256": "4890d3ce10fa71cf523d9ae24a7d2c0158c37e64967406376b1de09447bc8dac",
+      "lutSHA256": "e50813c7e54bd4e0d7648a60f7d838f4b278968d56e21b252f6f1d020b334097"
+    },
+    {
+      "id": "agfachrome100",
+      "name": "Agfachrome RSX II 100",
+      "sourceSHA256": "15219d798e347681d7d8dffbcfb7ab898932df5de81313e63d06c151f0fc91f6",
+      "lutSHA256": "cf3159aa9de22829b7271d0a126b0c99869808ea6b91d2c5c264cc520ad0d9b2"
+    },
+    {
+      "id": "agfachrome200",
+      "name": "Agfachrome RSX II 200",
+      "sourceSHA256": "04ef2771291e11e9b241e87529303d73f54c46e03f0edd1275e7db11b3c21889",
+      "lutSHA256": "a618f418611533f71bf6dfd6a94d7926fac884b2edc2933df4dbbfb4de9a7eff"
+    },
+    {
+      "id": "agfachrome50",
+      "name": "Agfachrome RSX II 50",
+      "sourceSHA256": "b6dab6981e8a75c28ffcca3280f1ac33fbff4417303203b7891c8d77c3ad542a",
+      "lutSHA256": "af9927e947a0fc8f0412afda48e8faad9555e6aa93344f8da2076bbfdc5e0af5"
+    },
+    {
+      "id": "astia100f",
+      "name": "Astia 100F",
+      "sourceSHA256": "82cf027d0d6064ba37c74d18ea15520e1c8642863e5d542cc1d6983ab29d5a61",
+      "lutSHA256": "6ad5a1add9e8b0d9a1f1c1aeb301ed79c4ad3a9433ea78f98dd28e8bb3e0d42f"
+    },
+    {
+      "id": "c200",
+      "name": "C200",
+      "sourceSHA256": "cc867a5de7751e8ca5f92c5b3fec1bf8a49608f40117f6f8ffff7ee67f76392b",
+      "lutSHA256": "7979b9e07cc2a0da9d2b3787eeaba92df64753007cd2ee0907e6e7a0a6d0ea85"
+    },
+    {
+      "id": "cinestill400d",
+      "name": "CineStill 400D",
+      "sourceSHA256": "a1e7468888afd7631b10e9d64dd3ce63334a8aea2c3e0f5302d864cd802aca26",
+      "lutSHA256": "8d643497d6d58f755e130c66ec036e400ada4949f32401a017c1b6ac2f9e8a0e"
+    },
+    {
+      "id": "cinestill800t",
+      "name": "CineStill 800T",
+      "sourceSHA256": "8bdc8f6fb014284ca8c3cb0f9a2e6a5d42c1204364ec30fc3706d5c8e3e4c1b4",
+      "lutSHA256": "09e2f6a9929987dea9f4c79fb6ea6fa895b04b329f625ac1f95c22422e2da5f4"
+    },
+    {
+      "id": "delta3200",
+      "name": "Delta 3200 Professional",
+      "sourceSHA256": "fcad28bd819c70e7dd919219d96035e66193a1d6e7944aea2bfaf9174b7574d8",
+      "lutSHA256": "87c8ea3de5779fcc4241e4d14f90ae9874852bee9e2ac914e71396a45660a738"
+    },
+    {
+      "id": "doublex5222",
+      "name": "Double-X 5222",
+      "sourceSHA256": "238e6dadb7cf0a7048a13500239a482af0f0a789c5d35969b32b2d23d894a82e",
+      "lutSHA256": "9016ba469033e3e5d796f7c69fbbfb7b3dea7c3e9bc02f5b9621c57292afcc71"
+    },
+    {
+      "id": "ektachromee100",
+      "name": "Ektachrome E100",
+      "sourceSHA256": "b2b3292ac8e079b38c41ef74faffc1e10c0e5585038609a646234e76d044d60b",
+      "lutSHA256": "7d34e6230afc93db11d0a7496f16cf55b0047c07b991581bdf5868ce2c104f3b"
+    },
+    {
+      "id": "ektar100",
+      "name": "Ektar 100",
+      "sourceSHA256": "2ce425c243a0dbeeb1e54c7069fb5057053396acde58103038102c1c0649f866",
+      "lutSHA256": "a29737e3fee5dc1fd87f3f5e32c9041c5f41347f182ec8e2410c6e066e56edeb"
+    },
+    {
+      "id": "eterna500",
+      "name": "Eterna 500",
+      "sourceSHA256": "e2ff51b7ed854496780fbced739ed68eded2d7f1195bbef945ba7fd1c69f9f6a",
+      "lutSHA256": "994ad7ae26c1ebb1a53ed6f9c154bfb7d87c4a3fe2300be84856e63a8f9b6473"
+    },
+    {
+      "id": "eternavivid500",
+      "name": "Eterna Vivid 500",
+      "sourceSHA256": "fc5d4dea18a02d4f7ebd61357c4384f6d624fb79384a197a619b4b7ad8da0012",
+      "lutSHA256": "b5ab98e11f4a5689b669d0537b0b4634557b68a20e00a66cfeda3fdb5b664109"
+    },
+    {
+      "id": "f64d",
+      "name": "F-64D",
+      "sourceSHA256": "b81ca4236b052617463df1b667da8d639e536193f9493c1e35b7d7f6902a46a9",
+      "lutSHA256": "be5848079cd5d5d4c3a33daef0f499b5c2e57b44937744f595e6d79484e78d52"
+    },
+    {
+      "id": "fp4plus125",
+      "name": "FP4 Plus",
+      "sourceSHA256": "e0a052e8f60046f4292a78d12390d1827516971eb0b164697094551019349ddd",
+      "lutSHA256": "0b0f2f86056bee497bd5b6db547668ee4157bc7e67c040f53f3eb24e1b6ceb26"
+    },
+    {
+      "id": "gold200",
+      "name": "Gold 200",
+      "sourceSHA256": "45ee77b6efe76cc5e03e9bf9180d67d381387f1ea49d7b771f869ac2d6b7d1f4",
+      "lutSHA256": "91b37c0529a41a6be9472058d740e11aed901de319748bbabb416425f8cf1136"
+    },
+    {
+      "id": "hp5plus400",
+      "name": "HP5 Plus",
+      "sourceSHA256": "94c63d6660e9aa1a7c6c2845a16ebbdd50d6944163be4dbf991c5511c3549c08",
+      "lutSHA256": "7899e1be2da3f51fd674366042e26a92fe3e5a15c86fcbade240b3b1904b1770"
+    },
+    {
+      "id": "infraredcolor",
+      "name": "Infrared Color",
+      "sourceSHA256": "afe4dac1f80d892e449fea74a4aef260890e0d2a896defd7176a16926dd8ceef",
+      "lutSHA256": "ace1a54bd6ca84685a6ade6b5dc043e7a8775a34560e502c454cc5d3bc285a18"
+    },
+    {
+      "id": "instaxmini",
+      "name": "instax mini",
+      "sourceSHA256": "83bba66e521f248cb823ea5a8e1af1444333cc49ea99401568a3017ad9ecb2e9",
+      "lutSHA256": "8be0d84f5030397bd54ac7f3b7e2c4469e469922233f2991f4d685e4b2ece2ff"
+    },
+    {
+      "id": "instaxwide",
+      "name": "instax wide",
+      "sourceSHA256": "9ecd6160eb914e64726fdd33f7e23d589c3a54ce5d4448f212b051bb7609dabc",
+      "lutSHA256": "dae2fda7032feeb7ec2ae17a7480b7e7a3759e8e5763cb1e65fdac4fad584e05"
+    },
+    {
+      "id": "kodachrome200",
+      "name": "Kodachrome 200",
+      "sourceSHA256": "c620901e14c9a1bad574e3e61ed8a96e01fa328a4d6e4407dc4408a6a45de70e",
+      "lutSHA256": "0e64e3a22b7d1c2496ba324be6912c8b693d97e6da441c8bf048e8246b407d1c"
+    },
+    {
+      "id": "kodachrome25",
+      "name": "Kodachrome 25",
+      "sourceSHA256": "e4399bd954e1eccd15643b4b79f57e2ca0ff5242b81bc6d3f676558ab6dbe96a",
+      "lutSHA256": "000cce5de059f7d71a6c9c589c9e0ff48702d1a13fff7936ec473f26ad5d8737"
+    },
+    {
+      "id": "kodachrome64",
+      "name": "Kodachrome 64",
+      "sourceSHA256": "2475676b85a66c325b63d5b2b2d17a8b1187ea81a5d0ecef6d8a31025b70e672",
+      "lutSHA256": "de599a23ab94ff60c4c51512f9dee8a194be2816f08baccd5b5fb241e10ef894"
+    },
+    {
+      "id": "kodacolor100",
+      "name": "Kodacolor 100",
+      "sourceSHA256": "a673c8fb87bcb74c436ae3b83d4f7d2ab645d74f876719fe56b9de8e6e74a075",
+      "lutSHA256": "8880511023b66bcf90a1d7e21b98aa7cd936bf88e6e6b8cc29020cd9b35ebefd"
+    },
+    {
+      "id": "lomochromemetropolis",
+      "name": "LomoChrome Metropolis",
+      "sourceSHA256": "64c4299a25c8e9683022373ce40fba15f2f5ed60fe929dc27266d289e2d0ee0f",
+      "lutSHA256": "fc528582b8a9d9ea64651ff2d51039a0a4b6094c8cc1f9ea5967c125fb8d813b"
+    },
+    {
+      "id": "lomochromepurple",
+      "name": "LomoChrome Purple",
+      "sourceSHA256": "6759b55c6d2ff144d132e25d4671969ef28c15666dd506a9350834e5eee08c77",
+      "lutSHA256": "35ea4ad4519f9d809e1d8a27627ad137e3f46805b2c955a33f1792e3c1bbee36"
+    },
+    {
+      "id": "lomochrometurquoise",
+      "name": "LomoChrome Turquoise",
+      "sourceSHA256": "187f2a1700407df72bdbb5afdbdfb4aaf8367325189cd6b7f7aaf905edc21d1f",
+      "lutSHA256": "d812a26873fee9b59077ceccf381ba8eb9fe6f87ebbb91d2d922336a906e5d8e"
+    },
+    {
+      "id": "lomocolor100",
+      "name": "Color Negative 100",
+      "sourceSHA256": "a682805cac3a3962566c98e752c08461bff10715e8582794a73604491fa4cc8e",
+      "lutSHA256": "00893982f5841f8eded067b8ce6ed84d3232dc699b8acf9164b089ac0756dad5"
+    },
+    {
+      "id": "phoenix200",
+      "name": "Harman Phoenix 200",
+      "sourceSHA256": "7db44ba2a22c578007bf8228cbd28958fb1f68197880d0a6056d0ae654198c0e",
+      "lutSHA256": "d9ad0476b94c61605ff669a1a3cef3af5ba57ca9123b55326382fc7490bcf0f6"
+    },
+    {
+      "id": "portra400",
+      "name": "Portra 400",
+      "sourceSHA256": "bd141e1a766aab29694965e49026b04c5af951cb639d854e9978c1935fbb5baa",
+      "lutSHA256": "52c1ccbee6c1d124c0e2e45258e5774f8d368158843a7baa7a1e2d0b70741227"
+    },
+    {
+      "id": "pro160ns",
+      "name": "PRO 160NS",
+      "sourceSHA256": "a3c43c7c7f5e9267240fb97c8301d54c7a2eff74330b244b9ab64574949b370f",
+      "lutSHA256": "c0602dd20a1864ac8d778e81290878a3f3c2e8ec12514e3fe9a84464825f2602"
+    },
+    {
+      "id": "pro400h",
+      "name": "PRO 400H",
+      "sourceSHA256": "8ac080d37fdea2da720745afb579f4e0ab31363ab0daf6ba3e2014bc0b693932",
+      "lutSHA256": "466439440847bcd25166529a112521d224c30ecd9a3748752335d7cebadf4354"
+    },
+    {
+      "id": "provia100f",
+      "name": "Provia 100F",
+      "sourceSHA256": "2132bbb74e2278b57863ec230e5560f5c67ca9256ffc85822cddc61a260563de",
+      "lutSHA256": "98eab5ca4738bde0650043ddf43f24c5469f21245171a22fb108a7a69ffc1eda"
+    },
+    {
+      "id": "reala100",
+      "name": "Reala 100",
+      "sourceSHA256": "fb1007fc46157f0a5486b5b6421a6a582fc6269e26e6e10e291234f4a35ed377",
+      "lutSHA256": "d04510662ec7affc9325d0a26c966f2efeb1df7077a9a63c84762d10a629c51f"
+    },
+    {
+      "id": "reala500d",
+      "name": "Reala 500D",
+      "sourceSHA256": "f961da0e35ffffba37eee596f6b5b0356adb2dc6f8c5d8c3804ce82a9df73c89",
+      "lutSHA256": "e778ea8b9049485424ae51f2746f7011fe629ef32d7379aa3f2ef29b2622044f"
+    },
+    {
+      "id": "superia200",
+      "name": "Superia 200",
+      "sourceSHA256": "16267770d7ad3d98ca4ce76f4ae65bbd40311d4bc30b49cf07e70bcb287d5fcb",
+      "lutSHA256": "eff02dd07d4c5964325a2762c453440b70e94782898b6eb8719646901d4416d6"
+    },
+    {
+      "id": "superia400",
+      "name": "Superia X-TRA 400",
+      "sourceSHA256": "28d44fe8799f20654c2c3a2ba117ba29dbeb22beeb37c1464b9ec735f9e9e4b1",
+      "lutSHA256": "372d86cf61c3ad3ddeb4cae0d5b19f237bc3aeacd8edcc7b25dec7a4208959dd"
+    },
+    {
+      "id": "tmax100",
+      "name": "T-MAX 100",
+      "sourceSHA256": "026c857a1faaff36524d5b04ab7714fac3bc348630409300a806c588825ba912",
+      "lutSHA256": "bb14ed707182e943917aeffd3a4d476d0f10f50a212547fdf2f241d2e023a3d4"
+    },
+    {
+      "id": "trix400",
+      "name": "Tri-X 400",
+      "sourceSHA256": "f592e1bf78b8aef40dea547bd4b5578913b04cdb4f6610b3141ec3a94b497d47",
+      "lutSHA256": "d2d3250cb28737d3071cb61d4e3239a4bdf745c18bc49ebd05b9c8dc47638a7b"
+    },
+    {
+      "id": "ultramax400",
+      "name": "UltraMax 400",
+      "sourceSHA256": "f71934dfa65ecc90e7078324179cb35d5cc9e07f14055e020263a5b2b8886752",
+      "lutSHA256": "aed06c1de310b874b6ec53a4f33d0357c63ec7b1911f31f00a415bcc4f6d6436"
+    },
+    {
+      "id": "velvia50",
+      "name": "Velvia 50",
+      "sourceSHA256": "199500f96b8cf9fa89e27ef31fa7a24011fec32dd0d3349d81bcc9783866e4f5",
+      "lutSHA256": "fe5c17fc1e8727eed3041127a0da54ca3d9853452a33ad3f0c6bb5c304f755e6"
+    },
+    {
+      "id": "verita200d",
+      "name": "VERITA 200D",
+      "sourceSHA256": "ca120bb380fdb94eeb25698994d3c73c4b52cace1fe1a74a16017d38ec99addf",
+      "lutSHA256": "9a4d65882719afa29a422bd3fcf5b0b739bb71a3653828b2b67bed1f96f9e3cd"
+    },
+    {
+      "id": "vision250d",
+      "name": "Vision3 250D",
+      "sourceSHA256": "ab1d7ec6ba7cc5365cc1ae432b80b4d5a446f0ad7350ddfd1309f8864557f144",
+      "lutSHA256": "c957c488c51b8f22d62c1182b92ef0ae88b8a6a4243851e2afa41c4270414b0b"
+    },
+    {
+      "id": "vision500t",
+      "name": "Vision3 500T",
+      "sourceSHA256": "262ff287ab1e6dcd9af2587bafbb5306761c4a62d0541ca27ef72912dbb9dc3c",
+      "lutSHA256": "11e54602b23f914fe425666a1724128e6d9f5dd38c3799933e34e553c9e1b7d1"
+    }
+  ]
+}

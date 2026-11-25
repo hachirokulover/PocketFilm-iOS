@@ -17,7 +17,9 @@ struct FilmRecipe: Codable, Equatable {
 
     // Full-frame spectral rendering is required for upstream overscan. Keep
     // its input bounded on phones; the film margin adds pixels outside it.
-    var processingEdge: Int { Int(pf_processing_edge(Int64(maxPhotoEdge), border.enabled, false)) }
+    var usesFotufilm: Bool { film.hasPrefix(FotufilmStock.prefix) }
+    var hasFilmBorder: Bool { border.enabled && !usesFotufilm }
+    var processingEdge: Int { Int(pf_processing_edge(Int64(maxPhotoEdge), hasFilmBorder, false)) }
 
     init() {}
 

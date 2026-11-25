@@ -91,6 +91,35 @@ final class PortTests: XCTestCase {
             "Film EV must be applied after metering and not cancelled by print compensation")
     }
 
+    func testFotufilmRecipeUsesItsOwnRendererAndKeepsExportRoute() throws {
+        let engine = try FilmEngine()
+        XCTAssertEqual(FotufilmStock.bundled.count, 47)
+        let color = CIImage(color: CIColor(red: 0.7, green: 0.1, blue: 0.25))
+            .cropped(to: CGRect(x: 0, y: 0, width: 32, height: 24))
+        var recipe = FilmRecipe()
+        recipe.border.enabled = true
+        XCTAssertEqual(recipe.processingEdge, 2048)
+        recipe.film = "fotufilm:gold200"
+        XCTAssertEqual(recipe.processingEdge, 4032)
+
+        let gold = try engine.render(color, recipe: recipe, preview: false)
+        XCTAssertEqual(gold.texture.width, 32)
+        XCTAssertEqual(gold.texture.height, 24)
+        let goldBytes = try engine.encode(gold, settings: recipe.export)
+        recipe.film = "fotufilm:trix400"
+        let triX = try engine.render(color, recipe: recipe, preview: false)
+        let triXBytes = try engine.encode(triX, settings: recipe.export)
+        XCTAssertNotEqual(goldBytes, triXBytes)
+
+        let roundTrip = try JSONDecoder().decode(FilmRecipe.self, from: JSONEncoder().encode(recipe))
+        XCTAssertEqual(roundTrip, recipe)
+        recipe.film = "fotufilm:missing"
+        XCTAssertThrowsError(try engine.render(color, recipe: recipe, preview: false))
+        recipe.film = FilmRecipe().film
+        XCTAssertTrue(recipe.hasFilmBorder)
+        XCTAssertEqual(recipe.processingEdge, 2048)
+    }
+
     func testResizeDoesNotAddTransparentBorder() {
         for origin in [CGPoint(x: 3, y: 5), CGPoint(x: 3.2, y: 5.7), CGPoint(x: -13.1, y: -5.3)] {
             let image = CIImage(color: .white).cropped(to: CGRect(origin: origin, size: CGSize(width: 4032, height: 3024)))

@@ -19,6 +19,13 @@ final class CameraModel {
     var showingResult = false
     var imageRevision = 0
     let stocks = FilmStock.bundled()
+    let fotufilmStocks = FotufilmStock.bundled
+    var selectedFilmName: String {
+        if recipe.usesFotufilm {
+            return fotufilmStocks.first { $0.recipeID == recipe.film }?.name ?? recipe.film
+        }
+        return stocks.first { $0.id == recipe.film }?.name ?? recipe.film
+    }
     private let camera = CameraService()
     private let worker = RenderWorker()
     private var active = false
@@ -69,10 +76,15 @@ final class CameraModel {
         return preferProRAW ? caps.supportsProRAW : caps.supportsBayer
     }
 
-    func updateRecipe() {
-        if let stock = stocks.first(where: { $0.id == recipe.film }) {
+    func selectFilm(_ id: String) {
+        if let stock = stocks.first(where: { $0.id == id }) {
+            recipe.film = id
             recipe.paper = stock.paper
             recipe.monochrome = stock.monochrome
+        } else if fotufilmStocks.contains(where: { $0.recipeID == id }) {
+            recipe.film = id
+            recipe.paper = ""
+            recipe.monochrome = false
         }
     }
 

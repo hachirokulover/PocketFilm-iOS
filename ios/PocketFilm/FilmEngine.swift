@@ -17,6 +17,7 @@ final class FilmEngine {
     let device: MTLDevice
     let context: CIContext
     private let handle: OpaquePointer
+    private var fotufilm: FotufilmRenderer?
     static let outputSpace = ExportColorSpace.sRGB.colorSpace
     static let linearProPhoto: CGColorSpace = {
         let white: [CGFloat] = [0.9642, 1, 0.8249]
@@ -153,7 +154,7 @@ final class FilmEngine {
         return scaled.cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
     }
 
-    func inputBuffer(_ image: CIImage) throws -> (MTLBuffer, Int, Int) {
+    func inputBuffer(_ image: CIImage, colorSpace: CGColorSpace = FilmEngine.linearProPhoto) throws -> (MTLBuffer, Int, Int) {
         let extent = image.extent
         guard !extent.isInfinite, !extent.isEmpty,
               extent.width <= 16384, extent.height <= 16384 else {
@@ -169,13 +170,23 @@ final class FilmEngine {
         autoreleasepool {
             context.render(image, toBitmap: buffer.contents(), rowBytes: width * 16,
                            bounds: CGRect(x: 0, y: 0, width: width, height: height),
-                           format: .RGBAf, colorSpace: Self.linearProPhoto)
+                           format: .RGBAf, colorSpace: colorSpace)
         }
         return (buffer, width, height)
     }
 
     func render(_ source: CIImage, recipe: FilmRecipe, preview: Bool) throws -> FilmFrame {
         let start = CFAbsoluteTimeGetCurrent()
+        if recipe.usesFotufilm {
+            let image = Self.resized(source, maxEdge: preview ? min(480, recipe.processingEdge) : recipe.processingEdge)
+            if fotufilm == nil { fotufilm = try FotufilmRenderer(device: device) }
+            guard let fotufilm else { throw PocketFailure.message("无法初始化 Fotufilm 调色。") }
+            let (buffer, width, height) = try inputBuffer(image, colorSpace: FotufilmRenderer.inputSpace)
+            let texture = try fotufilm.render(buffer: buffer, width: width, height: height,
+                stock: recipe.film, exposureEV: recipe.sceneEV)
+            return FilmFrame(texture: texture, elapsedMS: (CFAbsoluteTimeGetCurrent() - start) * 1000,
+                             colorSpace: FotufilmRenderer.outputSpace)
+        }
         let maxEdge = Int(pf_processing_edge(Int64(recipe.maxPhotoEdge), recipe.border.enabled, preview))
         let image = Self.resized(recipe.border.cropped(source), maxEdge: maxEdge)
         let data = try JSONEncoder().encode(recipe)

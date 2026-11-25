@@ -110,7 +110,7 @@ struct CameraView: View {
             parameter(.aperture, value: model.capabilities.map {
                 String(format: "ƒ/%.2f", $0.aperture)
             } ?? "—")
-            parameter(.film, value: model.stocks.first { $0.id == model.recipe.film }?.name ?? model.recipe.film)
+            parameter(.film, value: model.selectedFilmName)
         }
         .disabled(model.isProcessing || model.isSwitchingLens)
     }
@@ -236,18 +236,16 @@ private struct CameraSettingsPanel: View {
                             Text("等待相机就绪").foregroundStyle(.secondary)
                         }
                     case .film:
+                        if !model.fotufilmStocks.isEmpty {
+                            DisclosureGroup("Fotufilm · 调色配方") {
+                                ForEach(model.fotufilmStocks) { stock in
+                                    filmButton(stock.name, id: stock.recipeID)
+                                }
+                            }
+                        }
+                        Text("Spektrafilm").font(.headline)
                         ForEach(model.stocks) { stock in
-                            Button {
-                                model.recipe.film = stock.id
-                                model.updateRecipe()
-                                dismiss()
-                            } label: {
-                                HStack {
-                                    Text(stock.name)
-                                    Spacer()
-                                    if stock.id == model.recipe.film { Image(systemName: "checkmark") }
-                                }.frame(minHeight: 32)
-                            }.buttonStyle(.bordered)
+                            filmButton(stock.name, id: stock.id)
                         }
                     case .raw:
                         Picker("RAW 格式", selection: $model.preferProRAW) {
@@ -273,18 +271,26 @@ private struct CameraSettingsPanel: View {
                         adjustment("色温", value: $model.recipe.temperature, range: 2000...12000, step: 100,
                             text: "\(Int(model.recipe.temperature)) K")
                             .disabled(model.recipe.automaticWhiteBalance)
-                        adjustment("颗粒", value: $model.recipe.grainAmount, range: 0...2, step: 0.05,
-                            text: String(format: "%.2f", model.recipe.grainAmount))
-                        adjustment("光晕", value: $model.recipe.halationAmount, range: 0...4, step: 0.05,
-                            text: String(format: "%.2f", model.recipe.halationAmount))
+                        if !model.recipe.usesFotufilm {
+                            adjustment("颗粒", value: $model.recipe.grainAmount, range: 0...2, step: 0.05,
+                                text: String(format: "%.2f", model.recipe.grainAmount))
+                            adjustment("光晕", value: $model.recipe.halationAmount, range: 0...4, step: 0.05,
+                                text: String(format: "%.2f", model.recipe.halationAmount))
+                        } else {
+                            FotufilmControlsNote()
+                        }
                     case .framing:
                         Picker("取景框线", selection: $model.guide) {
                             ForEach(CompositionGuide.allCases) { Text($0.rawValue).tag($0) }
                         }.pickerStyle(.segmented)
-                        FilmBorderControls(settings: $model.recipe.border)
+                        if model.recipe.usesFotufilm {
+                            FotufilmControlsNote()
+                        } else {
+                            FilmBorderControls(settings: $model.recipe.border)
+                        }
                     case .output:
                         ExportControls(settings: $model.recipe.export, maxPhotoEdge: $model.recipe.maxPhotoEdge,
-                            hasFilmBorder: model.recipe.border.enabled, expanded: true)
+                            hasFilmBorder: model.recipe.hasFilmBorder, expanded: true)
                     }
                 }
                 .frame(maxWidth: 550, alignment: .leading)
@@ -297,6 +303,19 @@ private struct CameraSettingsPanel: View {
         }
     }
 
+    private func filmButton(_ name: String, id: String) -> some View {
+        Button {
+            model.selectFilm(id)
+            dismiss()
+        } label: {
+            HStack {
+                Text(name)
+                Spacer()
+                if id == model.recipe.film { Image(systemName: "checkmark") }
+            }.frame(minHeight: 32)
+        }.buttonStyle(.bordered)
+    }
+
     private func adjustment(_ title: String, value: Binding<Double>, range: ClosedRange<Double>,
                             step: Double, text: String) -> some View {
         VStack(spacing: 4) {
@@ -307,6 +326,32 @@ private struct CameraSettingsPanel: View {
             }
             Slider(value: value, in: range, step: step).accessibilityLabel(title)
         }
+    }
+}
+
+private struct FilmChoicePicker: View {
+    @Bindable var model: CameraModel
+
+    var body: some View {
+        Picker("胶片", selection: Binding(get: { model.recipe.film }, set: { model.selectFilm($0) })) {
+            Section("Spektrafilm") {
+                ForEach(model.stocks) { stock in Text(stock.name).tag(stock.id) }
+            }
+            if !model.fotufilmStocks.isEmpty {
+                Section("Fotufilm · 调色配方") {
+                    ForEach(model.fotufilmStocks) { stock in Text(stock.name).tag(stock.recipeID) }
+                }
+            }
+        }
+        .pickerStyle(.menu)
+    }
+}
+
+private struct FotufilmControlsNote: View {
+    var body: some View {
+        Text("Fotufilm 配方应用颜色与反差。颗粒、光晕和片边在 Spektrafilm 预设中可用。")
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 }
 
@@ -326,12 +371,17 @@ private struct CaptureView: View {
                         ContentUnavailableView("原片已保留", systemImage: "doc", description: Text("可以分享原片，或再次尝试显影。"))
                     }
                     Text(model.status).font(.caption).foregroundStyle(.secondary)
+                    FilmChoicePicker(model: model)
                     GroupBox {
                         ExportControls(settings: $model.recipe.export, maxPhotoEdge: $model.recipe.maxPhotoEdge,
-                            hasFilmBorder: model.recipe.border.enabled, expanded: true)
+                            hasFilmBorder: model.recipe.hasFilmBorder, expanded: true)
                     }
-                    GroupBox("片边") {
-                        FilmBorderControls(settings: $model.recipe.border)
+                    if model.recipe.usesFotufilm {
+                        FotufilmControlsNote()
+                    } else {
+                        GroupBox("片边") {
+                            FilmBorderControls(settings: $model.recipe.border)
+                        }
                     }
                     if !current {
                         Text("设置已改变或尚未生成成片。可先重新显影预览；保存时会自动应用当前设置。")
@@ -362,16 +412,20 @@ private struct CaptureView: View {
                         Slider(value: $model.recipe.temperature, in: 2000...12000, step: 100)
                             .disabled(model.recipe.automaticWhiteBalance)
                     }
-                    HStack {
-                        Text(String(format: "颗粒 %.2f", model.recipe.grainAmount))
-                        Slider(value: $model.recipe.grainAmount, in: 0...2, step: 0.05)
-                    }
-                    HStack {
-                        Text(String(format: "光晕 %.2f", model.recipe.halationAmount))
-                        Slider(value: $model.recipe.halationAmount, in: 0...4, step: 0.05)
+                    if !model.recipe.usesFotufilm {
+                        HStack {
+                            Text(String(format: "颗粒 %.2f", model.recipe.grainAmount))
+                            Slider(value: $model.recipe.grainAmount, in: 0...2, step: 0.05)
+                        }
+                        HStack {
+                            Text(String(format: "光晕 %.2f", model.recipe.halationAmount))
+                            Slider(value: $model.recipe.halationAmount, in: 0...4, step: 0.05)
+                        }
                     }
                     Button("应用设置并预览成片") { model.reprocess(item) }
-                    Text("画面长边上限 \(model.recipe.processingEdge) 像素，开启片边后会增加外侧像素。")
+                    Text(model.recipe.hasFilmBorder
+                        ? "画面长边上限 \(model.recipe.processingEdge) 像素，外加片边。"
+                        : "画面长边上限 \(model.recipe.processingEdge) 像素。")
                         .font(.caption).foregroundStyle(.secondary)
                 }.padding().disabled(model.isProcessing || saving)
             }.navigationTitle("胶片成片").navigationBarTitleDisplayMode(.inline)
@@ -399,8 +453,12 @@ private struct LicensesView: View {
                     Link("SpektraLab 源码", destination: URL(string: "https://github.com/JamesQiu2005/SpektraLab")!)
                     Link("spektrafilm 模型与数据", destination: URL(string: "https://github.com/andreavolpato/spektrafilm")!)
                 }
+                Section("Fotufilm 调色配方") {
+                    Text("配方来源为 Fotufilm（© 2026 MUAStudio Inc.），已转换为 3D 调色表。原配方与调色表按 CC BY-SA 4.0 提供。")
+                    Link("Fotufilm", destination: URL(string: "https://fotufilm.com")!)
+                }
                 Section("开源许可") {
-                    ForEach(["GPL-3.0.txt", "SPEKTRAFILM_LICENSE.txt", "metal-cpp-LICENSE.txt", "PRODUCT_PROFILES_NOTICE.md", "Rust-dependencies.txt"], id: \.self) { name in
+                    ForEach(["GPL-3.0.txt", "SPEKTRAFILM_LICENSE.txt", "metal-cpp-LICENSE.txt", "PRODUCT_PROFILES_NOTICE.md", "Rust-dependencies.txt", "Fotufilm-FILM-PROFILES.txt", "Fotufilm-CC-BY-SA-4.0.txt"], id: \.self) { name in
                         NavigationLink(name) {
                             ScrollView { Text(license(name)).font(.caption.monospaced()).padding().textSelection(.enabled) }
                                 .navigationTitle(name)

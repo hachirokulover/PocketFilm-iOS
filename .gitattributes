@@ -3,3 +3,4 @@
 *.py text eol=lf
 *.bin binary
 *.icc binary
+*.rgba16f binary

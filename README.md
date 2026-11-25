@@ -4,9 +4,9 @@
   <img src="ios/PocketFilm/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="112" height="112" alt="PocketFilm 应用图标">
 </p>
 
-PocketFilm 是基于 SpektraLab 的非官方 iPhone RAW 相机。你可以拍摄 Apple ProRAW 或 Bayer RAW，也可以从相册或「文件」导入图像。应用在设备上执行光谱胶片显影，保留原片，并生成可保存或分享的 JPG、HEIF 成片。
+PocketFilm 是基于 SpektraLab 的非官方 iPhone RAW 相机。你可以拍摄 Apple ProRAW 或 Bayer RAW，也可以从相册或「文件」导入图像。应用在设备上显影，保留原片，并生成可保存或分享的 JPG、HEIF 成片。内置 **20 种 Spektrafilm 预设**和 **47 种 Fotufilm 调色配方**。
 
-[上手指南](#上手指南) · [功能与参数](#功能与参数) · [构建和安装](#构建和安装) · [项目架构](#项目架构) · [上游与许可](#上游与许可)
+[上手指南](#上手指南) · [功能与参数](#功能与参数) · [Fotufilm 调色配方](#fotufilm-调色配方) · [构建和安装](#构建和安装) · [项目架构](#项目架构) · [上游与许可](#上游与许可)
 
 当前源码版本为 **0.3.0（build 3）**，最低部署目标为 **iOS 17**，构建需要 **Xcode 27 和 iOS 27 SDK**。可变光圈需要 iOS 27 或更新版本，以及支持该能力的镜头和拍摄配置。
 
@@ -14,7 +14,7 @@ PocketFilm 是基于 SpektraLab 的非官方 iPhone RAW 相机。你可以拍摄
 
 ### 拍一张 RAW
 
-1. 打开 PocketFilm，允许访问相机。等取景画面和快门可用后，从顶部参数栏选择「镜头」、「RAW 格式」和「胶片」。默认胶片是 **Kodak Portra 400**。
+1. 打开 PocketFilm，允许访问相机。等取景画面和快门可用后，从顶部参数栏选择「镜头」、「RAW 格式」和「胶片」。默认胶片是 Spektrafilm 的 **Kodak Portra 400**。展开「Fotufilm · 调色配方」可选用另一组配方。
 2. 在取景画面上点一下，选择自动对焦区域。需要辅助线时，打开「构图」，选择九宫格、方形或 16:9。
 3. 如需调整胶片曝光、色温、颗粒或光晕，打开「显影」。如需提前选定成片格式，点操作栏里显示 **JPG** 或 **HEIF** 的导出按钮。
 4. 按圆形快门。应用先把 RAW 写入「本地底片」，再按当前设置显影。显影成功后自动打开「胶片成片」。
@@ -30,7 +30,7 @@ PocketFilm 是基于 SpektraLab 的非官方 iPhone RAW 相机。你可以拍摄
 
 ### 修改成片、保存和分享
 
-1. 在「胶片成片」页调整色温、颗粒、光晕、片边或「成片导出」设置。
+1. 在「胶片成片」页可切换胶片，或调整色温、颗粒、光晕、片边和「成片导出」设置。颗粒、光晕和片边适用于 Spektrafilm 预设。
 2. 点 **应用设置并预览成片**，从本地原片重新显影。页面显示当前成片及其像素尺寸和处理耗时。
 3. 点 **保存 RAW 与成片到相册**，把原始 RAW 与成片保存成两个独立的相册项目。普通照片导入后，按钮为 **保存成片到相册**，只新增显影后的照片。首次保存时按 iOS 提示授予相册添加权限。
 4. 需要保存到「文件」或发给别人时，使用分享按钮。成片与当前设置一致时，可分享原片、成片和 `recipe.json`。设置有变更时，分享入口只提供原片。重新显影后即可分享新成片。
@@ -70,7 +70,7 @@ PocketFilm 是基于 SpektraLab 的非官方 iPhone RAW 相机。你可以拍摄
 | 光晕 | 0–4，步长 0.05。设为 0 时关闭。 | 1 |
 | 相纸 | 随胶片配置自动匹配。 | 随胶片 |
 
-当前菜单有 **20 种胶片配置**，包括 16 种彩色配置和 4 种黑白配置。Portra 800 的两种增感配置各计一种。
+Spektrafilm 分组有 **20 种胶片配置**，包括 16 种彩色配置和 4 种黑白配置。Portra 800 的两种增感配置各计一种。
 
 | 类别 | 胶片 |
 | --- | --- |
@@ -78,6 +78,12 @@ PocketFilm 是基于 SpektraLab 的非官方 iPhone RAW 相机。你可以拍摄
 | Kodak 电影胶片及相关配置 | Verita 200D、Vision3 50D、Vision3 200T、Vision3 250D、Vision3 500T |
 | Fujifilm 彩色负片 | C200、Pro 400H、X-Tra 400 |
 | 黑白胶片 | Fujifilm Neopan 100 Acros II、Ilford HP5 Plus 400、Kodak T-Max 100、Kodak Tri-X 400 |
+
+### Fotufilm 调色配方
+
+胶片菜单还提供 **47 种 Fotufilm 调色配方**，例如 Kodachrome 64、Ektachrome E100、CineStill 800T、Harman Phoenix 200、FP4 Plus 和 LomoChrome Purple。拍摄或导入前，从顶部「胶片」进入 Fotufilm 分组。拍摄或导入后，从「胶片成片」页的「胶片」菜单选择配方，再点「应用设置并预览成片」。两组中同名的胶卷拥有各自的配方。
+
+Fotufilm 配方通过离线 3D 调色表重现固定显影条件下的颜色与反差，支持显影曝光、色温、JPG／HEIF、色域、尺寸和压缩质量。颗粒、光晕和片边在 Spektrafilm 预设中使用。调色表随应用打包，可离线使用。 [移植说明与配方许可](ios/Fotufilm/README.md)
 
 ### 胶片片边
 
@@ -154,14 +160,16 @@ bash ios/Tools/verify-on-mac.sh 'platform=iOS Simulator,id=替换为模拟器的
 | 目录 | 负责内容 |
 | --- | --- |
 | [`ios/PocketFilm/`](ios/PocketFilm/) | SwiftUI 界面、AVFoundation 拍摄和取景、Core Image RAW 解码与成片编码、系统照片选择器和本地底片管理。 |
-| [`ios/RustCore/`](ios/RustCore/) | 将胶片、曝光、颗粒、光晕、片边和导出设置转换为引擎参数，计算缩放尺寸和压缩质量，管理渲染会话、结果纹理和错误。Xcode 将 Rust 核心编译为静态库。 |
+| [`ios/RustCore/`](ios/RustCore/) | 将 Spektrafilm 胶片、曝光、颗粒、光晕、片边和导出设置转换为引擎参数，计算缩放尺寸和压缩质量，管理渲染会话、结果纹理和错误。Xcode 将 Rust 核心编译为静态库。 |
 | [`engine/`](engine/) | SpektraLab 的 C++／Metal 光谱引擎和胶片资源，执行实际的颜色、颗粒、光晕和片边像素运算。 |
+| [`ios/Fotufilm/`](ios/Fotufilm/) | 47 份从 Fotufilm 渲染生成的 3D 调色表和配方索引，由 iOS 的 Metal 渲染路径读取。 |
 | [`ios/Tools/`](ios/Tools/) 与 [GitHub Actions 工作流](.github/workflows/ios-pocketfilm.yml) | 项目生成与校验、iOS Metal 编译、Rust 编译、测试和 IPA 打包。 |
 
-相机或导入原片 → Swift 和系统框架解码 → Rust 整理参数并调度渲染 → C++／Metal 显影 → Core Image 编码 → 本地底片库与系统相册。
+拍摄或导入后，系统框架负责解码。Spektrafilm 通过 Rust 调度 C++／Metal 光谱引擎。Fotufilm 通过 Metal 应用 3D 调色表。两组共用 Core Image 编码、本地底片库和相册保存流程。
 
 ## 上游与许可
 
 - PocketFilm 是 Hanze Qiu（JamesQiu2005）的 SpektraLab 的非官方 iOS 移植。上游源码基线为 `02d82b56cf65f0f8e802a708612edc4e9a4790af`。 [SpektraLab 上游提交](https://github.com/JamesQiu2005/SpektraLab/tree/02d82b56cf65f0f8e802a708612edc4e9a4790af)
 - 光谱胶片模型与数据来自 Andrea Volpato 的 spektrafilm。原始 profiles、LUT 与直接衍生数据适用 **CC BY-SA 4.0**。 [spektrafilm](https://github.com/andreavolpato/spektrafilm) · [数据许可与署名](license/SPEKTRAFILM_LICENSE.txt)
+- Fotufilm 调色表源自 Fotufilm（© 2026 MUAStudio Inc.）的胶片配方，转换后的数据按 **CC BY-SA 4.0** 提供。 [来源与改动](ios/Fotufilm/README.md) · [配方署名](license/Fotufilm-FILM-PROFILES.txt) · [完整许可](license/Fotufilm-CC-BY-SA-4.0.txt)
 - 项目代码采用 **GPL-3.0-or-later**。第三方依赖及 SpektraLab 新增配置保留各自的许可和来源声明。应用右上角「关于」也可查看随程序分发的许可。 [代码许可](license/LICENSE) · [Metal-cpp 许可](engine/third_party/metal-cpp/LICENSE.txt) · [新增胶片配置声明](engine/resources_product/NOTICE.md)

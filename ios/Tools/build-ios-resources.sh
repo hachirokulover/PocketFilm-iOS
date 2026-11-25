@@ -45,9 +45,14 @@ cp "$repo/license/LICENSE" "$dest/Licenses/GPL-3.0.txt"
 cp "$repo/license/SPEKTRAFILM_LICENSE.txt" "$dest/Licenses/SPEKTRAFILM_LICENSE.txt"
 cp "$repo/engine/third_party/metal-cpp/LICENSE.txt" "$dest/Licenses/metal-cpp-LICENSE.txt"
 cp "$repo/engine/resources_product/NOTICE.md" "$dest/Licenses/PRODUCT_PROFILES_NOTICE.md"
+mkdir -p "$dest/Fotufilm"
+rsync -a "$here/Fotufilm/Assets/" "$dest/Fotufilm/"
+cp "$repo/license/Fotufilm-FILM-PROFILES.txt" "$dest/Licenses/"
+cp "$repo/license/Fotufilm-CC-BY-SA-4.0.txt" "$dest/Licenses/"
 for required in engine/spektrafilm_constants.bin engine/spektrafilm.metallib \
   engine/profiles/kodak_portra_400.json engine/profiles/kodak_portra_endura.json \
-  Licenses/GPL-3.0.txt Licenses/SPEKTRAFILM_LICENSE.txt Licenses/metal-cpp-LICENSE.txt; do
+  Licenses/GPL-3.0.txt Licenses/SPEKTRAFILM_LICENSE.txt Licenses/metal-cpp-LICENSE.txt \
+  Fotufilm/catalogue.json Licenses/Fotufilm-FILM-PROFILES.txt Licenses/Fotufilm-CC-BY-SA-4.0.txt; do
   [[ -s "$dest/$required" ]] || { echo "Missing bundle resource: $required" >&2; exit 1; }
 done
 echo "Bundled iOS engine resources for $sdk (safe/precise math)"

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Portable structural checks. This does NOT compile Swift or execute Metal."""
+import hashlib
 import importlib.util
 import json
 import plistlib
@@ -9,6 +10,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
+
+
+def validate_fotufilm(errors):
+    directory = ROOT / "Fotufilm/Assets"
+    catalogue = json.loads((directory / "catalogue.json").read_text(encoding="utf-8"))
+    manifest = (REPO / "license/Fotufilm-FILM-PROFILES.txt").read_text(encoding="utf-8")
+    expected = set(re.findall(r"^  ([a-z0-9]+)\.json$", manifest, re.MULTILINE))
+    stocks = catalogue["stocks"]
+    ids = {stock["id"] for stock in stocks}
+    if catalogue["dimension"] != 33 or len(stocks) != 47 or ids != expected:
+        errors.append("Fotufilm catalogue must match the 47 attributed 33³ profiles")
+        return
+    assets = {path.stem for path in directory.glob("*.rgba16f")}
+    if assets != ids:
+        errors.append(f"Fotufilm assets differ from manifest: {sorted(assets ^ ids)}")
+        return
+    for stock in stocks:
+        data = (directory / (stock["id"] + ".rgba16f")).read_bytes()
+        if len(data) != 33 ** 3 * 8 or hashlib.sha256(data).hexdigest() != stock["lutSHA256"]:
+            errors.append(f"Invalid Fotufilm LUT: {stock['id']}")
 
 
 def validate():
@@ -81,10 +102,13 @@ def validate():
     if count == 0: errors.append("No film/paper pair can be shown")
     required_files = ["license/LICENSE", "license/SPEKTRAFILM_LICENSE.txt",
         "engine/third_party/metal-cpp/LICENSE.txt", "engine/resources_product/NOTICE.md",
-        "engine/resources/spektrafilm_constants.bin"]
+        "engine/resources/spektrafilm_constants.bin", "license/Fotufilm-FILM-PROFILES.txt",
+        "license/Fotufilm-CC-BY-SA-4.0.txt", "ios/Fotufilm/Assets/catalogue.json"]
     for rel in required_files:
         path = REPO / rel
         if not path.is_file() or not path.stat().st_size: errors.append(f"Missing source resource: {rel}")
+    if not errors:
+        validate_fotufilm(errors)
     ET.parse(ROOT / "PocketFilm.xcodeproj/xcshareddata/xcschemes/PocketFilm.xcscheme")
     spec = importlib.util.spec_from_file_location("ios_project", ROOT / "Tools/gen-project.py")
     module = importlib.util.module_from_spec(spec)
@@ -94,7 +118,7 @@ def validate():
             errors.append(f"Generated project is stale: {path.name}")
     if errors:
         raise SystemExit("\n".join("FAIL: " + error for error in errors))
-    print(f"PASS: wire keys/ranges, 10 upstream film-border gates, permissions, project, SDK/math flags, licenses, {len(profiles)} profiles ({count} film/paper pairs)")
+    print(f"PASS: wire keys/ranges, 10 upstream film-border gates, permissions, project, SDK/math flags, licenses, {len(profiles)} profiles ({count} film/paper pairs), 47 Fotufilm LUTs")
     print("NOT RUN: Xcode build, Swift type checking, Metal compilation, iPhone capture/performance")
 
 
