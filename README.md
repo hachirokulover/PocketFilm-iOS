@@ -149,10 +149,10 @@ bash ios/Tools/verify-on-mac.sh 'platform=iOS Simulator,id=替换为模拟器的
 
 ### 构建记录与真机截图
 
-提交 `f7d3398` 的 [GitHub Actions 第 7 次运行](https://github.com/hachirokulover/PocketFilm-iOS/actions/runs/45399193063) 已通过 Rust 主机测试并生成未签名设备 IPA。该次运行跳过了模拟器测试。项目此前记录曾在 iPhone 18 Pro（iOS 27.2）上验证镜头切换与可变光圈。下图为早期版本的实机截图。
+提交 `f7d3398` 的 [GitHub Actions 第 7 次运行](https://github.com/hachirokulover/PocketFilm-iOS/actions/runs/45399193063) 已通过 Rust 主机测试并生成未签名设备 IPA。该次运行跳过了模拟器测试。项目此前记录曾在 iPhone 18 Pro（iOS 27.2）上验证镜头切换与可变光圈。下图为当前版本的实机截图。
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/244821b3-9bd6-4e08-8733-c68b96775a6c" width="180" alt="PocketFilm 早期版本的 iPhone 实机截图">
+  <img width="240" height="520" alt="ce75b00f263f0e13e120f197768ae28b" src="https://github.com/user-attachments/assets/b7dae099-de52-45a0-888a-aae7bab98c09" />
 </p>
 
 ## 项目架构
